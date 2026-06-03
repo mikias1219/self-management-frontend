@@ -12,3 +12,9 @@ export interface AiCoachSession extends BaseEntity {
   messages?: AiCoachMessage[];
   isArchived: boolean;
 }
+
+export interface AiChatResponse {
+  sessionId: string;
+  reply: string;
+  messages: AiCoachMessage[];
+}

@@ -64,7 +64,7 @@ type DialogMode =
   | "income-cat"
   | null;
 
-export default function FinancePage() {
+export function FinanceModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const pageTab = useStandUi((s) => s.pageTab["finance"] ?? "overview");
@@ -155,6 +155,18 @@ export default function FinancePage() {
       },
     },
   );
+  const updateAccount = useStandMutation(
+    ({ id, data }: { id: string; data: Partial<FinanceAccount> }) =>
+      financeApi.accounts.update(id, data),
+    {
+      invalidateKeys: invalidateFinance,
+      onSuccess: () => {
+        setDialogMode(null);
+        setEditing(null);
+        toast.success("Account updated");
+      },
+    },
+  );
   const deleteAccount = useStandMutation(
     (id: string) => financeApi.accounts.remove(id),
     {
@@ -170,6 +182,18 @@ export default function FinancePage() {
       onSuccess: () => {
         setDialogMode(null);
         toast.success("Budget created");
+      },
+    },
+  );
+  const updateBudget = useStandMutation(
+    ({ id, data }: { id: string; data: Partial<Budget> }) =>
+      financeApi.budgets.update(id, data),
+    {
+      invalidateKeys: invalidateFinance,
+      onSuccess: () => {
+        setDialogMode(null);
+        setEditing(null);
+        toast.success("Budget updated");
       },
     },
   );
@@ -308,7 +332,6 @@ export default function FinancePage() {
         description="Accounts, budgets, savings, and cash flow."
         icon={DollarSign}
         iconClassName="bg-amber-500/15 text-amber-700"
-        showPeriod={false}
       >
         <div className="rounded-lg border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
           Sign in to manage your finances.
@@ -435,6 +458,10 @@ export default function FinancePage() {
             data={accountList}
             loading={accounts.isLoading}
             getRowId={(r) => r.id}
+            onEdit={(row) => {
+              setEditing({ type: "account", id: row.id });
+              setDialogMode("account");
+            }}
             onDelete={(row) =>
               confirmDelete("account", () => deleteAccount.mutate(row.id))
             }
@@ -459,16 +486,28 @@ export default function FinancePage() {
                         {b.periodStart} → {b.periodEnd}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() =>
-                        confirmDelete("budget", () => deleteBudget.mutate(b.id))
-                      }
-                    >
-                      Delete
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditing({ type: "budget", id: b.id });
+                          setDialogMode("budget");
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() =>
+                          confirmDelete("budget", () => deleteBudget.mutate(b.id))
+                        }
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                   <p className="mt-2 text-lg font-semibold tabular-nums">
                     {formatMoney(spent)} / {formatMoney(amount)}
@@ -606,6 +645,16 @@ export default function FinancePage() {
             ? (savings.data ?? []).find((g) => g.id === editing.id)
             : undefined
         }
+        editAccount={
+          editing?.type === "account"
+            ? accountList.find((a) => a.id === editing.id)
+            : undefined
+        }
+        editBudget={
+          editing?.type === "budget"
+            ? (budgets.data ?? []).find((b) => b.id === editing.id)
+            : undefined
+        }
         onSubmitTx={(data) => {
           if (editing?.type === "transaction") {
             updateTx.mutate({ id: editing.id, data });
@@ -613,8 +662,20 @@ export default function FinancePage() {
             createTx.mutate(data);
           }
         }}
-        onSubmitAccount={(data) => createAccount.mutate(data)}
-        onSubmitBudget={(data) => createBudget.mutate(data)}
+        onSubmitAccount={(data) => {
+          if (editing?.type === "account") {
+            updateAccount.mutate({ id: editing.id, data });
+          } else {
+            createAccount.mutate(data);
+          }
+        }}
+        onSubmitBudget={(data) => {
+          if (editing?.type === "budget") {
+            updateBudget.mutate({ id: editing.id, data });
+          } else {
+            createBudget.mutate(data);
+          }
+        }}
         onSubmitSavings={(data) => {
           if (editing?.type === "savings") {
             updateSavings.mutate({ id: editing.id, data });
@@ -639,6 +700,8 @@ function FinanceDialog({
   editingId,
   editTx,
   editSavings,
+  editAccount,
+  editBudget,
   onSubmitTx,
   onSubmitAccount,
   onSubmitBudget,
@@ -655,6 +718,8 @@ function FinanceDialog({
   editingId?: string;
   editTx?: FinanceTransaction;
   editSavings?: SavingsGoal;
+  editAccount?: FinanceAccount;
+  editBudget?: Budget;
   onSubmitTx: (d: Partial<FinanceTransaction>) => void;
   onSubmitAccount: (d: Partial<FinanceAccount>) => void;
   onSubmitBudget: (d: Partial<Budget>) => void;
@@ -666,8 +731,8 @@ function FinanceDialog({
 
   const titles: Record<NonNullable<DialogMode>, string> = {
     transaction: editingId ? "Edit transaction" : "Add transaction",
-    account: "Add account",
-    budget: "Add budget",
+    account: editingId ? "Edit account" : "Add account",
+    budget: editingId ? "Edit budget" : "Add budget",
     savings: editingId ? "Edit savings goal" : "Add savings goal",
     "expense-cat": "Add expense category",
     "income-cat": "Add income category",
@@ -768,11 +833,16 @@ function FinanceDialog({
               });
             }}
           >
-            <FormField label="Name" name="name" required />
+            <FormField
+              label="Name"
+              name="name"
+              required
+              defaultValue={editAccount?.name}
+            />
             <FormSelect
               label="Type"
               name="accountType"
-              defaultValue="checking"
+              defaultValue={editAccount?.accountType ?? "checking"}
               options={ACCOUNT_TYPES.map((t) => ({ value: t, label: t }))}
             />
             <div className="grid grid-cols-2 gap-3">
@@ -781,9 +851,13 @@ function FinanceDialog({
                 name="balance"
                 type="number"
                 step="0.01"
-                defaultValue="0"
+                defaultValue={editAccount?.balance ?? "0"}
               />
-              <FormField label="Currency" name="currency" defaultValue="USD" />
+              <FormField
+                label="Currency"
+                name="currency"
+                defaultValue={editAccount?.currency ?? "USD"}
+              />
             </div>
             <DialogFooter>
               <Button type="submit">Save account</Button>
@@ -806,16 +880,40 @@ function FinanceDialog({
               });
             }}
           >
-            <FormField label="Budget name" name="name" required />
-            <FormField label="Limit amount" name="amount" type="number" step="0.01" required />
+            <FormField
+              label="Budget name"
+              name="name"
+              required
+              defaultValue={editBudget?.name}
+            />
+            <FormField
+              label="Limit amount"
+              name="amount"
+              type="number"
+              step="0.01"
+              required
+              defaultValue={editBudget?.amount}
+            />
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Period start" name="periodStart" type="date" required />
-              <FormField label="Period end" name="periodEnd" type="date" required />
+              <FormField
+                label="Period start"
+                name="periodStart"
+                type="date"
+                required
+                defaultValue={editBudget?.periodStart}
+              />
+              <FormField
+                label="Period end"
+                name="periodEnd"
+                type="date"
+                required
+                defaultValue={editBudget?.periodEnd}
+              />
             </div>
             <FormSelect
               label="Expense category (optional)"
               name="categoryId"
-              defaultValue=""
+              defaultValue={editBudget?.categoryId ?? ""}
               options={[
                 { value: "", label: "All expenses" },
                 ...expenseCats.map((c) => ({ value: c.id, label: c.name })),

@@ -15,3 +15,4 @@ export * from "./settings";
 export * from "./ai-coach";
 export * from "./activity-log";
 export * from "./dashboard";
+export * from "./achievements";

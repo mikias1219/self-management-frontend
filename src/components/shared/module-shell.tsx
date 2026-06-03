@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { PeriodFilter } from "@/components/shared/period-filter";
+import { useHubEmbedded } from "@/components/hubs/hub-context";
 import { cn } from "@/lib/utils";
 
 interface ModuleShellProps {
@@ -11,7 +11,6 @@ interface ModuleShellProps {
   iconClassName?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
-  showPeriod?: boolean;
 }
 
 export function ModuleShell({
@@ -21,8 +20,22 @@ export function ModuleShell({
   iconClassName,
   children,
   actions,
-  showPeriod = true,
 }: ModuleShellProps) {
+  const embedded = useHubEmbedded();
+
+  if (embedded) {
+    return (
+      <div className="space-y-6">
+        {actions && (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border/60 pb-4">
+            {actions}
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -46,10 +59,9 @@ export function ModuleShell({
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {showPeriod && <PeriodFilter className="lg:flex-wrap" />}
-          {actions}
-        </div>
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
       {children}
     </div>

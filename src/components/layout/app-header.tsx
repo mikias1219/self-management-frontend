@@ -1,9 +1,9 @@
 "use client";
 
-import { Bell, LogOut, Search, User } from "lucide-react";
+import { Bell, LogOut, User } from "lucide-react";
+import { ModuleSearch } from "@/components/layout/module-search";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,14 +47,10 @@ export function AppHeader({ title }: AppHeaderProps) {
           {title}
         </h1>
       )}
-      <div className="relative ml-auto flex flex-1 items-center gap-3 sm:max-w-md">
-        <Search className="absolute left-2.5 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search modules..."
-          className="h-8 bg-muted/40 pl-8 text-sm"
-        />
+      <div className="ml-auto flex min-w-0 flex-1 items-center gap-2 sm:max-w-xs md:max-w-sm">
+        <ModuleSearch />
       </div>
-      <PeriodFilter className="hidden lg:flex" />
+      <PeriodFilter className="max-w-full shrink-0 overflow-x-auto" />
       <Button
         variant="ghost"
         size="icon-sm"

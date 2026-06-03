@@ -1,6 +1,5 @@
 "use client";
 
-import { PeriodFilter } from "@/components/shared/period-filter";
 import { ActivityFeed } from "@/components/shared/activity-feed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { activityLogsApi } from "@/lib/api";
@@ -8,7 +7,7 @@ import { hasAuthToken } from "@/lib/api/client";
 import { usePeriod } from "@/hooks/use-period";
 import { useStandData } from "@/hooks/use-stand-data";
 
-export default function ActivityLogsPage() {
+export function ActivityLogsModule() {
   const authenticated = hasAuthToken();
   const { query } = usePeriod();
 
@@ -30,7 +29,6 @@ export default function ActivityLogsPage() {
             Audit trail of actions across all LifeOS modules.
           </p>
         </div>
-        <PeriodFilter />
       </div>
 
       {!authenticated && (

@@ -26,7 +26,7 @@ import type { Habit } from "@/lib/types";
 
 const FREQUENCIES = ["daily", "weekly", "monthly"] as const;
 
-export default function HabitsPage() {
+export function HabitsModule() {
   const { label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
@@ -108,7 +108,7 @@ export default function HabitsPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="Habits" icon={Repeat} iconClassName="bg-blue-500/15 text-blue-600" showPeriod={false}>
+      <ModuleShell title="Habits" icon={Repeat} iconClassName="bg-blue-500/15 text-blue-600">
         <p className="text-center text-sm text-muted-foreground py-12">Sign in to track habits.</p>
       </ModuleShell>
     );

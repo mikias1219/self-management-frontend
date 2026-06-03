@@ -37,7 +37,7 @@ const LEVELS: GoalLevel[] = [
   "daily",
 ];
 
-export default function GoalsPage() {
+export function GoalsModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
@@ -104,7 +104,10 @@ export default function GoalsPage() {
         cell: (r) => {
           const n = taskCountByGoal.get(r.id) ?? 0;
           return n > 0 ? (
-            <Link href="/tasks" className="text-sky-600 hover:underline">
+            <Link
+              href="/productivity?tab=plans"
+              className="text-sky-600 hover:underline"
+            >
               {n} linked
             </Link>
           ) : (
@@ -134,7 +137,7 @@ export default function GoalsPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="Goals" icon={Flag} iconClassName="bg-cyan-500/15 text-cyan-600" showPeriod={false}>
+      <ModuleShell title="Goals" icon={Flag} iconClassName="bg-cyan-500/15 text-cyan-600">
         <p className="py-12 text-center text-sm text-muted-foreground">Sign in to manage goals.</p>
       </ModuleShell>
     );

@@ -33,7 +33,7 @@ import { useStandUi } from "@/stores/use-stand";
 
 const STATUSES = ["not_started", "in_progress", "completed", "paused"] as const;
 
-export default function LearningPage() {
+export function LearningModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const pageTab = useStandUi((s) => s.pageTab["learning"] ?? "books");
@@ -97,7 +97,7 @@ export default function LearningPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="Learning" icon={BookOpen} iconClassName="bg-emerald-500/15 text-emerald-600" showPeriod={false}>
+      <ModuleShell title="Learning" icon={BookOpen} iconClassName="bg-emerald-500/15 text-emerald-600">
         <p className="text-center text-sm text-muted-foreground py-12">Sign in to track learning.</p>
       </ModuleShell>
     );

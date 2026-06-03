@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { PeriodFilter } from "@/components/shared/period-filter";
 import { hasAuthToken } from "@/lib/api/client";
 import { usePeriod } from "@/hooks/use-period";
 import { useStandUi } from "@/stores/use-stand";
@@ -106,7 +105,6 @@ export function ModulePage<T extends { id: string }>({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PeriodFilter className="lg:hidden" />
           {createFn && (
             <Button size="sm" onClick={() => setModuleDialogOpen(moduleKey, true)}>
               <Plus className="size-4" />

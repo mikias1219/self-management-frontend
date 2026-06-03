@@ -12,6 +12,7 @@ export * from "./health";
 export * from "./journal";
 export * from "./analytics";
 export * from "./dashboard";
+export * from "./achievements";
 export * from "./activity-logs";
 export * from "./notifications";
 export * from "./settings";

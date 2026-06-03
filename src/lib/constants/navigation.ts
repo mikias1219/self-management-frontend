@@ -1,21 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
-  BarChart3,
   Bell,
-  BookOpen,
-  Bot,
-  CheckSquare,
-  DollarSign,
-  FileText,
-  Flag,
-  Heart,
-  Languages,
+  GraduationCap,
+  HeartHandshake,
   LayoutDashboard,
-  Repeat,
+  LineChart,
+  ListChecks,
   Settings,
-  Sparkles,
-  Sun,
 } from "lucide-react";
 
 export interface NavItem {
@@ -24,17 +15,16 @@ export interface NavItem {
   icon: LucideIcon;
   group?: string;
   color: string;
+  description?: string;
 }
 
 export const NAV_GROUP_COLORS: Record<string, string> = {
   Overview: "text-violet-600",
-  Productivity: "text-sky-600",
-  Growth: "text-emerald-600",
-  Life: "text-amber-700",
-  Insights: "text-fuchsia-600",
+  "Life areas": "text-sky-600",
   System: "text-slate-600",
 };
 
+/** Sidebar: one entry per life area; related modules live in hub tabs. */
 export const NAV_ITEMS: NavItem[] = [
   {
     title: "Dashboard",
@@ -42,90 +32,39 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     group: "Overview",
     color: "bg-violet-500/15 text-violet-600",
+    description: "Results and achievements across all areas",
   },
   {
-    title: "Tasks",
-    href: "/tasks",
-    icon: CheckSquare,
-    group: "Productivity",
+    title: "Productivity",
+    href: "/productivity",
+    icon: ListChecks,
+    group: "Life areas",
     color: "bg-sky-500/15 text-sky-600",
+    description: "Plans, tasks, goals, habits, daily reviews",
   },
   {
-    title: "Goals",
-    href: "/goals",
-    icon: Flag,
-    group: "Productivity",
-    color: "bg-cyan-500/15 text-cyan-600",
-  },
-  {
-    title: "Habits",
-    href: "/habits",
-    icon: Repeat,
-    group: "Productivity",
-    color: "bg-blue-500/15 text-blue-600",
-  },
-  {
-    title: "Daily Reviews",
-    href: "/daily-reviews",
-    icon: Sun,
-    group: "Productivity",
-    color: "bg-indigo-500/15 text-indigo-600",
-  },
-  {
-    title: "Learning",
-    href: "/learning",
-    icon: BookOpen,
-    group: "Growth",
+    title: "Growth",
+    href: "/growth",
+    icon: GraduationCap,
+    group: "Life areas",
     color: "bg-emerald-500/15 text-emerald-600",
+    description: "Learning and English",
   },
   {
-    title: "Finance",
-    href: "/finance",
-    icon: DollarSign,
-    group: "Life",
+    title: "Life",
+    href: "/life",
+    icon: HeartHandshake,
+    group: "Life areas",
     color: "bg-amber-500/15 text-amber-700",
+    description: "Finance, spiritual, health, journal",
   },
   {
-    title: "English",
-    href: "/english",
-    icon: Languages,
-    group: "Growth",
-    color: "bg-teal-500/15 text-teal-600",
-  },
-  {
-    title: "Spiritual",
-    href: "/spiritual",
-    icon: Sparkles,
-    group: "Life",
-    color: "bg-purple-500/15 text-purple-600",
-  },
-  {
-    title: "Health",
-    href: "/health",
-    icon: Heart,
-    group: "Life",
-    color: "bg-rose-500/15 text-rose-600",
-  },
-  {
-    title: "Journal",
-    href: "/journal",
-    icon: FileText,
-    group: "Life",
-    color: "bg-orange-500/15 text-orange-600",
-  },
-  {
-    title: "Analytics",
-    href: "/analytics",
-    icon: BarChart3,
-    group: "Insights",
+    title: "Insights",
+    href: "/insights",
+    icon: LineChart,
+    group: "Life areas",
     color: "bg-fuchsia-500/15 text-fuchsia-600",
-  },
-  {
-    title: "Activity Logs",
-    href: "/activity-logs",
-    icon: Activity,
-    group: "Insights",
-    color: "bg-pink-500/15 text-pink-600",
+    description: "Analytics and activity log",
   },
   {
     title: "Notifications",
@@ -133,13 +72,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Bell,
     group: "System",
     color: "bg-slate-500/15 text-slate-600",
-  },
-  {
-    title: "AI Coach",
-    href: "/ai-coach",
-    icon: Bot,
-    group: "System",
-    color: "bg-zinc-500/15 text-zinc-600",
   },
   {
     title: "Settings",
@@ -150,11 +82,94 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export const NAV_GROUPS = [
-  "Overview",
-  "Productivity",
-  "Growth",
-  "Life",
-  "Insights",
-  "System",
-] as const;
+export const NAV_GROUPS = ["Overview", "Life areas", "System"] as const;
+
+/** Deep links for header search (hub + tab). */
+export const NAV_SEARCH_EXTRAS: NavItem[] = [
+  {
+    title: "Plans & tasks",
+    href: "/productivity?tab=plans",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-sky-500/15 text-sky-600",
+  },
+  {
+    title: "Goals",
+    href: "/productivity?tab=goals",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-cyan-500/15 text-cyan-600",
+  },
+  {
+    title: "Habits",
+    href: "/productivity?tab=habits",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-blue-500/15 text-blue-600",
+  },
+  {
+    title: "Daily review",
+    href: "/productivity?tab=reviews",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-indigo-500/15 text-indigo-600",
+  },
+  {
+    title: "Learning",
+    href: "/growth?tab=learning",
+    icon: GraduationCap,
+    group: "Growth",
+    color: "bg-emerald-500/15 text-emerald-600",
+  },
+  {
+    title: "English",
+    href: "/growth?tab=english",
+    icon: GraduationCap,
+    group: "Growth",
+    color: "bg-teal-500/15 text-teal-600",
+  },
+  {
+    title: "Finance",
+    href: "/life?tab=finance",
+    icon: HeartHandshake,
+    group: "Life",
+    color: "bg-amber-500/15 text-amber-700",
+  },
+  {
+    title: "Spiritual",
+    href: "/life?tab=spiritual",
+    icon: HeartHandshake,
+    group: "Life",
+    color: "bg-purple-500/15 text-purple-600",
+  },
+  {
+    title: "Health",
+    href: "/life?tab=health",
+    icon: HeartHandshake,
+    group: "Life",
+    color: "bg-rose-500/15 text-rose-600",
+  },
+  {
+    title: "Journal",
+    href: "/life?tab=journal",
+    icon: HeartHandshake,
+    group: "Life",
+    color: "bg-orange-500/15 text-orange-600",
+  },
+  {
+    title: "Analytics",
+    href: "/insights?tab=analytics",
+    icon: LineChart,
+    group: "Insights",
+    color: "bg-fuchsia-500/15 text-fuchsia-600",
+  },
+  {
+    title: "Activity log",
+    href: "/insights?tab=activity",
+    icon: LineChart,
+    group: "Insights",
+    color: "bg-pink-500/15 text-pink-600",
+  },
+];
+
+export const ALL_SEARCH_NAV = [...NAV_ITEMS, ...NAV_SEARCH_EXTRAS];

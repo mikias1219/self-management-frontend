@@ -26,7 +26,7 @@ import { hasAuthToken } from "@/lib/api/client";
 import type { DailyReview } from "@/lib/types";
 import { filterByDateField } from "@/lib/utils/period";
 
-export default function DailyReviewsPage() {
+export function DailyReviewsModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
@@ -110,7 +110,7 @@ export default function DailyReviewsPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="Daily Reviews" icon={Sun} iconClassName="bg-indigo-500/15 text-indigo-600" showPeriod={false}>
+      <ModuleShell title="Daily Reviews" icon={Sun} iconClassName="bg-indigo-500/15 text-indigo-600">
         <p className="text-center text-sm text-muted-foreground py-12">Sign in to write reviews.</p>
       </ModuleShell>
     );

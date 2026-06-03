@@ -30,6 +30,7 @@ export default function NotificationsPage() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<Notification | null>(null);
 
   const { data: all, isLoading } = useStandData(
     ["notifications"],
@@ -55,10 +56,17 @@ export default function NotificationsPage() {
   );
 
   const save = useStandMutation(
-    (data: Partial<Notification>) => notificationsApi.create(data),
+    (p: { id?: string; data: Partial<Notification> }) =>
+      p.id
+        ? notificationsApi.update(p.id, p.data)
+        : notificationsApi.create(p.data),
     {
       invalidateKeys: [["notifications"]],
-      onSuccess: () => { setOpen(false); toast.success("Notification created"); },
+      onSuccess: () => {
+        setOpen(false);
+        setEdit(null);
+        toast.success("Notification saved");
+      },
     },
   );
 
@@ -97,7 +105,7 @@ export default function NotificationsPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="Notifications" icon={Bell} iconClassName="bg-slate-500/15 text-slate-600" showPeriod={false}>
+      <ModuleShell title="Notifications" icon={Bell} iconClassName="bg-slate-500/15 text-slate-600">
         <p className="text-center text-sm text-muted-foreground py-12">Sign in to view notifications.</p>
       </ModuleShell>
     );
@@ -110,7 +118,7 @@ export default function NotificationsPage() {
       icon={Bell}
       iconClassName="bg-slate-500/15 text-slate-600"
       actions={
-        <Button size="sm" onClick={() => setOpen(true)}>
+        <Button size="sm" onClick={() => { setEdit(null); setOpen(true); }}>
           <Plus className="size-4" /> Add
         </Button>
       }
@@ -125,6 +133,7 @@ export default function NotificationsPage() {
         data={notifications}
         loading={isLoading}
         getRowId={(r) => r.id}
+        onEdit={(r) => { setEdit(r); setOpen(true); }}
         onDelete={(r) => {
           if (window.confirm("Delete?")) remove.mutate(r.id);
         }}
@@ -132,22 +141,27 @@ export default function NotificationsPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New notification</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{edit ? "Edit notification" : "New notification"}</DialogTitle>
+          </DialogHeader>
           <form className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             save.mutate({
-              title: String(fd.get("title")),
-              message: String(fd.get("message")),
+              id: edit?.id,
+              data: {
+                title: String(fd.get("title")),
+                message: String(fd.get("message")),
+              },
             });
           }}>
             <div className="space-y-1.5">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required />
+              <Input id="title" name="title" required defaultValue={edit?.title} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="message">Message</Label>
-              <Textarea id="message" name="message" rows={3} required />
+              <Textarea id="message" name="message" rows={3} required defaultValue={edit?.message} />
             </div>
             <DialogFooter><Button type="submit">Save</Button></DialogFooter>
           </form>

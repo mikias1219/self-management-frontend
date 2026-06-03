@@ -35,7 +35,7 @@ const PRACTICE_TYPES: EnglishPracticeType[] = [
   "grammar",
 ];
 
-export default function EnglishPage() {
+export function EnglishModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
@@ -102,7 +102,7 @@ export default function EnglishPage() {
 
   if (!authenticated) {
     return (
-      <ModuleShell title="English" icon={Languages} iconClassName="bg-teal-500/15 text-teal-600" showPeriod={false}>
+      <ModuleShell title="English" icon={Languages} iconClassName="bg-teal-500/15 text-teal-600">
         <p className="text-center text-sm text-muted-foreground py-12">Sign in to track practice.</p>
       </ModuleShell>
     );

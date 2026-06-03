@@ -1,6 +1,8 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BarChart3 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { MetricChart } from "@/components/shared/metric-chart";
 import { StatCard } from "@/components/shared/stat-card";
@@ -29,6 +31,17 @@ const LIFE_KEYS = [
   "journalEntries",
 ] as const;
 
+const MANAGE_LINKS = [
+  { label: "Plans & tasks", href: "/productivity?tab=plans" },
+  { label: "Goals", href: "/productivity?tab=goals" },
+  { label: "Habits", href: "/productivity?tab=habits" },
+  { label: "Learning", href: "/growth?tab=learning" },
+  { label: "English", href: "/growth?tab=english" },
+  { label: "Finance", href: "/life?tab=finance" },
+  { label: "Health", href: "/life?tab=health" },
+  { label: "Journal", href: "/life?tab=journal" },
+] as const;
+
 function sliceCounts(
   counts: ModuleCounts,
   keys: readonly (keyof ModuleCounts)[],
@@ -42,7 +55,7 @@ function sliceCounts(
     .filter((d) => d.value > 0);
 }
 
-export default function AnalyticsPage() {
+export function AnalyticsModule() {
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const { summary: financeSummary } = useFinanceRelations();
@@ -86,7 +99,6 @@ export default function AnalyticsPage() {
         title="Analytics"
         icon={BarChart3}
         iconClassName="bg-fuchsia-500/15 text-fuchsia-600"
-        showPeriod={false}
       >
         <p className="py-12 text-center text-sm text-muted-foreground">
           Sign in to view analytics.
@@ -120,6 +132,30 @@ export default function AnalyticsPage() {
           loading={isLoading}
         />
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Manage your data</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Analytics is read-only. Create, edit, and delete records in these
+            areas:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {MANAGE_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                {link.label}
+                <ArrowRight className="size-3" />
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <MetricChart
