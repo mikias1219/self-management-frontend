@@ -37,6 +37,8 @@ export const financeApi = {
   cycles: {
     getAll: () =>
       apiClient.get<FinanceCycle[]>("/finance/cycles").then((r) => r.data),
+    getOne: (id: string) =>
+      apiClient.get<FinanceCycle>(`/finance/cycles/${id}`).then((r) => r.data),
     getCurrent: () =>
       apiClient
         .get<FinanceCycle | null>("/finance/cycles/current")
@@ -44,6 +46,12 @@ export const financeApi = {
     updateAllocation: (data: CycleAllocation) =>
       apiClient
         .patch<FinanceCycle>("/finance/cycles/current/allocation", data)
+        .then((r) => r.data),
+    markObligationPaid: (obligationId: string, transactionId: string) =>
+      apiClient
+        .patch(`/finance/cycles/obligations/${obligationId}/pay`, {
+          transactionId,
+        })
         .then((r) => r.data),
   },
   getSummary: (params?: DateRangeQuery) =>

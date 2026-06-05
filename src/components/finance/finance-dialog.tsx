@@ -61,6 +61,7 @@ export interface TxPresetValues {
   incomeSource?: FinanceTransaction["incomeSource"];
   amount?: number;
   description?: string;
+  accountId?: string;
   pendingObligationId?: string;
   savingsGoalId?: string;
   toAccountId?: string;
@@ -258,9 +259,10 @@ export function FinanceDialog({
               required
               defaultValue={
                 editTx?.accountId ??
-                presetValues?.transactionType === "transfer"
+                presetValues?.accountId ??
+                (presetValues?.transactionType === "transfer"
                   ? checkingAccounts[0]?.id
-                  : accounts[0]?.id
+                  : checkingAccounts[0]?.id ?? accounts[0]?.id)
               }
               options={accounts.map((a) => ({
                 value: a.id,

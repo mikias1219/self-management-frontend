@@ -14,7 +14,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -23,7 +23,8 @@ import { StatCard } from "@/components/shared/stat-card";
 import { StatGrid } from "@/components/shared/stat-grid";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FormField } from "@/components/shared/form-fields";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ModuleRelations } from "@/components/shared/module-relations";
 import {
   FinanceDialog,
@@ -106,6 +107,10 @@ export function FinanceModule() {
   const recurring = useStandData(["finance", "recurring"], () =>
     financeApi.recurringObligations.getAll(),
   );
+  const allCycles = useStandData(["finance", "cycles"], () =>
+    financeApi.cycles.getAll(),
+    { enabled: authenticated },
+  );
   const userSettings = useStandData(["settings"], () => settingsApi.get(), {
     enabled: authenticated,
   });
@@ -136,6 +141,25 @@ export function FinanceModule() {
 
   const currentCycle = s?.currentCycle ?? null;
 
+  const [allocation, setAllocation] = useState({
+    fixedObligations: 0,
+    savingsTarget: 0,
+  });
+
+  useEffect(() => {
+    if (!currentCycle) return;
+    setAllocation({
+      fixedObligations: Number(currentCycle.fixedObligations),
+      savingsTarget: Number(currentCycle.savingsTarget),
+    });
+  }, [currentCycle?.id, currentCycle?.fixedObligations, currentCycle?.savingsTarget]);
+
+  const pastCycles = useMemo(
+    () =>
+      (allCycles.data ?? []).filter((c) => c.cycleStatus === "closed"),
+    [allCycles.data],
+  );
+
   const intel = financeIntel.data;
   const currency = intel?.currency ?? accountList[0]?.currency ?? "ETB";
 
@@ -145,6 +169,7 @@ export function FinanceModule() {
     ["finance", "transactions", query],
     ["finance", "budgets"],
     ["finance", "savings"],
+    ["finance", "cycles"],
     ["dashboard", "pos"], // keep main dashboard in sync (net balance, etc.)
   ];
 
@@ -404,11 +429,13 @@ export function FinanceModule() {
   };
 
   const payObligation = (o: FinanceSummaryObligation) => {
+    const checkingAccount = accountList.find((a) => a.accountType === "checking");
     openTransaction("pay_obligation", {
       transactionType: "expense",
       amount: o.expectedAmount,
       pendingObligationId: o.id,
       description: `Payment: ${o.name}`,
+      accountId: checkingAccount?.id ?? accountList[0]?.id,
     });
   };
 
@@ -514,7 +541,7 @@ export function FinanceModule() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
-          {!s?.currentCycle && (
+          {(!s?.currentCycle || Number(s.currentCycle.netSalary) === 0) && (
             <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 space-y-3">
               <p className="font-medium flex items-center gap-2">
                 <Calendar className="size-4" />
@@ -855,73 +882,104 @@ export function FinanceModule() {
         <TabsContent value="cycle" className="mt-4 space-y-4">
           {currentCycle ? (
             <>
+              {(() => {
+                const netSalary = Number(currentCycle.netSalary);
+                const spendingBudget = Math.round(
+                  (netSalary -
+                    allocation.fixedObligations -
+                    allocation.savingsTarget) *
+                    100,
+                ) / 100;
+                const allocationValid =
+                  allocation.fixedObligations + allocation.savingsTarget <=
+                  netSalary + 0.001;
+                return (
               <div className="rounded-lg border bg-card p-4 space-y-3">
                 <p className="font-medium">Cycle allocation</p>
                 <p className="text-sm text-muted-foreground">
-                  Fixed + savings + spending must equal net salary (
-                  {formatMoney(currentCycle.netSalary, currency)})
+                  Net salary {formatMoney(netSalary, currency)} — set fixed and
+                  savings; spending fills the remainder.
                 </p>
                 <form
                   className="grid gap-3 sm:grid-cols-3"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const net = Number(currentCycle.netSalary);
-                    const fixed = Number(fd.get("fixedObligations")) || 0;
-                    const savings = Number(fd.get("savingsTarget")) || 0;
-                    if (fixed + savings > net) {
+                    if (!allocationValid) {
                       toast.error(
-                        `Fixed + savings (${formatMoney(fixed + savings, currency)}) cannot exceed net salary (${formatMoney(net, currency)})`,
+                        `Fixed + savings cannot exceed net salary (${formatMoney(netSalary, currency)})`,
                       );
                       return;
                     }
                     updateAllocation.mutate({
-                      fixedObligations: fixed,
-                      savingsTarget: savings,
-                      spendingBudget: net - fixed - savings,
+                      fixedObligations: allocation.fixedObligations,
+                      savingsTarget: allocation.savingsTarget,
+                      spendingBudget: Math.max(0, spendingBudget),
                     });
                   }}
                 >
-                  <FormField
-                    label="Fixed obligations"
-                    name="fixedObligations"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    defaultValue={currentCycle.fixedObligations}
-                  />
-                  <FormField
-                    label="Savings target"
-                    name="savingsTarget"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    defaultValue={currentCycle.savingsTarget}
-                  />
                   <div className="space-y-1.5">
-                    <p className="text-sm font-medium leading-none">Spending budget</p>
-                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm tabular-nums">
-                      {formatMoney(
-                        Math.max(
-                          0,
-                          Number(currentCycle.netSalary) -
-                            Number(currentCycle.fixedObligations) -
-                            Number(currentCycle.savingsTarget),
-                        ),
-                        currency,
-                      )}
+                    <Label htmlFor="fixedObligations">Fixed obligations</Label>
+                    <Input
+                      id="fixedObligations"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={allocation.fixedObligations}
+                      onChange={(e) =>
+                        setAllocation((a) => ({
+                          ...a,
+                          fixedObligations: Number(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="savingsTarget">Savings target</Label>
+                    <Input
+                      id="savingsTarget"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={allocation.savingsTarget}
+                      onChange={(e) =>
+                        setAllocation((a) => ({
+                          ...a,
+                          savingsTarget: Number(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium leading-none">
+                      Spending budget (sent on save)
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Auto-calculated: net salary minus fixed and savings
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm tabular-nums">
+                      {formatMoney(Math.max(0, spendingBudget), currency)}
+                    </p>
+                    <p
+                      className={`text-xs tabular-nums ${
+                        allocationValid ? "text-muted-foreground" : "text-destructive"
+                      }`}
+                    >
+                      {allocationValid
+                        ? `Remaining after save: ${formatMoney(0, currency)}`
+                        : `Over by ${formatMoney(
+                            allocation.fixedObligations +
+                              allocation.savingsTarget -
+                              netSalary,
+                            currency,
+                          )}`}
                     </p>
                   </div>
                   <div className="sm:col-span-3">
-                    <Button type="submit" size="sm">
+                    <Button type="submit" size="sm" disabled={!allocationValid}>
                       Save allocation
                     </Button>
                   </div>
                 </form>
               </div>
+                );
+              })()}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border p-4">
                   <p className="text-xs text-muted-foreground">Fixed paid</p>
@@ -948,6 +1006,32 @@ export function FinanceModule() {
                   </p>
                 </div>
               </div>
+
+              {pastCycles.length > 0 && (
+                <div className="rounded-lg border bg-card p-4 space-y-3">
+                  <h3 className="text-sm font-medium">Past cycles</h3>
+                  <ul className="space-y-2 text-sm">
+                    {pastCycles.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2"
+                      >
+                        <span>
+                          {c.startDate} → {c.endDate}
+                        </span>
+                        <span className="text-muted-foreground tabular-nums">
+                          Net {formatMoney(Number(c.netSalary), currency)} ·
+                          Savings {formatPercent(Number(c.actualSavingsRate ?? 0))} ·
+                          Health {c.financialHealthScore ?? 0}/100
+                          {c.largestExpenseCategory
+                            ? ` · Top: ${c.largestExpenseCategory}`
+                            : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
