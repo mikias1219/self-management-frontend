@@ -67,13 +67,19 @@ function sliceCounts(
 }
 
 export function AnalyticsModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("analytics");
   const authenticated = hasAuthToken();
   const { summary: financeSummary } = useFinanceRelations();
 
   const { data, isLoading } = useStandData(
     ["analytics", "counts", query],
     () => analyticsApi.getCounts(query),
+    { enabled: authenticated, staleTime: 60_000 },
+  );
+
+  const { data: taskIntel, isLoading: taskIntelLoading } = useStandData(
+    ["analytics", "task-intelligence"],
+    () => analyticsApi.getTaskIntelligence(),
     { enabled: authenticated, staleTime: 60_000 },
   );
 
@@ -186,6 +192,38 @@ export function AnalyticsModule() {
           multiColor
         />
       </div>
+
+      {taskIntel && taskIntel.byLifeArea.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <MetricChart
+            title="Open tasks by life area"
+            data={taskIntel.byLifeArea.map((a) => ({
+              name: a.lifeArea.replace(/_/g, " "),
+              value: a.open,
+              moduleKey: a.lifeArea,
+            }))}
+            type="bar"
+            loading={taskIntelLoading}
+            height={220}
+            multiColor
+          />
+          <MetricChart
+            title="Overdue by life area"
+            data={taskIntel.byLifeArea
+              .filter((a) => a.overdue > 0)
+              .map((a) => ({
+                name: a.lifeArea.replace(/_/g, " "),
+                value: a.overdue,
+                moduleKey: a.lifeArea,
+              }))}
+            type="bar"
+            loading={taskIntelLoading}
+            height={220}
+            color="#ef4444"
+            multiColor
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricChart

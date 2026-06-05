@@ -23,6 +23,7 @@ export interface PosDashboardOverview {
     savingsRate: number;
     burnRate: number;
     forecastEndOfMonthNet: number;
+    remainingUnallocated: number;
   };
   taskStatus: {
     pending: number;

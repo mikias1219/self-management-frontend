@@ -23,8 +23,14 @@ const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-export function PeriodFilter({ className }: { className?: string }) {
-  const { period, setPeriod, setCustomRange } = usePeriod();
+export function PeriodFilter({
+  moduleId = "default",
+  className,
+}: {
+  moduleId?: string;
+  className?: string;
+}) {
+  const { period, setPeriod, setCustomRange } = usePeriod(moduleId);
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>

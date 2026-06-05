@@ -36,7 +36,7 @@ const PRACTICE_TYPES: EnglishPracticeType[] = [
 ];
 
 export function EnglishModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("english");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<EnglishPractice | null>(null);

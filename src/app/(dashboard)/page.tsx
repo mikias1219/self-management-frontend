@@ -8,7 +8,7 @@ const DashboardOverview = dynamic(
     })),
   {
     loading: () => (
-      <div className="mx-auto w-full max-w-5xl space-y-4">
+      <div className="mx-auto w-full max-w-7xl space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
@@ -23,7 +23,7 @@ const DashboardOverview = dynamic(
 
 export default function DashboardPage() {
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-7xl">
       <DashboardOverview />
     </div>
   );

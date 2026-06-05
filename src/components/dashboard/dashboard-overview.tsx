@@ -18,10 +18,16 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HubOverview } from "@/components/dashboard/hub-overview";
 import { authApi, dashboardApi, financeApi, productivityApi } from "@/lib/api";
-import { hasAuthToken } from "@/lib/api/client";
+import { useHasAuthToken } from "@/hooks/use-has-auth-token";
 import { useStandData } from "@/hooks/use-stand-data";
-import { formatMoney } from "@/lib/utils/period";
+import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
+
+function savingsRateColor(rate: number) {
+  if (rate > 15) return "text-emerald-600";
+  if (rate >= 5) return "text-amber-600";
+  return "text-red-600";
+}
 
 function greeting(date = new Date()) {
   const h = date.getHours();
@@ -40,28 +46,47 @@ function formatMinutes(m: number) {
 
 /** Personal OS dashboard — progressive sections, no full-page blocking. */
 export function DashboardOverview() {
-  const authenticated = hasAuthToken();
+  const authenticated = useHasAuthToken();
+  const authReady = authenticated === true;
 
   const { data, isLoading: overviewLoading } = useStandData(
     ["dashboard", "pos"],
     () => dashboardApi.getOverview(),
-    { enabled: authenticated, staleTime: 60_000 },
+    { enabled: authReady, staleTime: 30_000 },
   );
   const { data: today } = useStandData(
     ["productivity", "schedule", "today"],
     () => productivityApi.getSchedule({ scope: "today" }),
-    { enabled: authenticated, staleTime: 60_000 },
+    { enabled: authReady, staleTime: 30_000 },
   );
   const { data: user } = useStandData(["auth", "me"], () => authApi.me(), {
-    enabled: authenticated,
+    enabled: authReady,
     staleTime: 120_000,
   });
 
   const { data: budgets, isLoading: budgetsLoading } = useStandData(
     ["finance", "budgets"],
     () => financeApi.budgets.getAll(),
-    { enabled: authenticated, staleTime: 60_000 },
+    { enabled: authReady, staleTime: 30_000 },
   );
+
+  if (authenticated === null) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border shadow-sm">
+              <CardContent className="h-24" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!authenticated) {
     return (
@@ -241,11 +266,24 @@ export function DashboardOverview() {
               <Skeleton className="h-40 w-full" />
             ) : (
               <>
-                <div>
-                  <p className="text-xs text-muted-foreground">Income received</p>
-                  <p className="text-xl font-semibold tabular-nums">
-                    {formatMoney(data.financialSnapshot.monthlyIncome, currency)}
-                  </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Income received</p>
+                    <p className="text-xl font-semibold tabular-nums">
+                      {formatMoney(data.financialSnapshot.monthlyIncome, currency)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Savings rate</p>
+                    <p
+                      className={cn(
+                        "text-xl font-semibold tabular-nums",
+                        savingsRateColor(data.financialSnapshot.savingsRate),
+                      )}
+                    >
+                      {formatPercent(data.financialSnapshot.savingsRate)}
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -281,11 +319,7 @@ export function DashboardOverview() {
                   </p>
                   <p className="text-xl font-semibold tabular-nums text-emerald-600">
                     {formatMoney(
-                      Math.max(
-                        0,
-                        data.financialSnapshot.monthlyIncome -
-                          (budgets?.reduce((s, b) => s + b.amount, 0) ?? 0),
-                      ),
+                      Math.max(0, data.financialSnapshot.remainingUnallocated),
                       currency,
                     )}
                   </p>

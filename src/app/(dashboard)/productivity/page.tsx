@@ -5,7 +5,7 @@ import { PRODUCTIVITY_HUB } from "@/components/hubs/configs/productivity-hub";
 
 export default function ProductivityPage() {
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-7xl">
       <HubPageShell {...PRODUCTIVITY_HUB} />
     </div>
   );

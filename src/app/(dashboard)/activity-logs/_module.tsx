@@ -9,7 +9,7 @@ import { useStandData } from "@/hooks/use-stand-data";
 
 export function ActivityLogsModule() {
   const authenticated = hasAuthToken();
-  const { query } = usePeriod();
+  const { query } = usePeriod("activity-logs");
 
   const { data, isLoading } = useStandData(
     ["activity-logs", query],

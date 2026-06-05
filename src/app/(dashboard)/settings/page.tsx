@@ -39,7 +39,7 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Settings</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -83,7 +83,7 @@ export default function SettingsPage() {
                     void mutation.mutate({
                       timezone: data?.timezone ?? "UTC",
                       locale: data?.locale ?? "en",
-                      theme: "light",
+                      theme: data?.theme ?? "light",
                       modulePreferences: {
                         ...(data?.modulePreferences ?? {}),
                         accentColor,

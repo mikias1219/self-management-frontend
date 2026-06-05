@@ -110,32 +110,60 @@ export const useStandUi = create<StandUiState>((set) => ({
     })),
 }));
 
-interface StandPeriodState {
+type PeriodSlice = {
   period: AnalyticsPeriod;
   customStart?: Date;
   customEnd?: Date;
-  setPeriod: (period: AnalyticsPeriod) => void;
-  setCustomRange: (start: Date, end: Date) => void;
-  getLabel: () => string;
-  getQuery: () => DateRangeQuery;
+};
+
+export const DEFAULT_PERIOD_SLICE: PeriodSlice = { period: "week" };
+
+function getModuleSlice(
+  modules: Record<string, PeriodSlice>,
+  moduleId: string,
+): PeriodSlice {
+  return modules[moduleId] ?? DEFAULT_PERIOD_SLICE;
+}
+
+interface StandPeriodState {
+  modules: Record<string, PeriodSlice>;
+  setPeriod: (moduleId: string, period: AnalyticsPeriod) => void;
+  setCustomRange: (moduleId: string, start: Date, end: Date) => void;
+  getLabel: (moduleId?: string) => string;
+  getQuery: (moduleId?: string) => DateRangeQuery;
 }
 
 export const useStandPeriod = create<StandPeriodState>((set, get) => ({
-  period: "week",
-  customStart: undefined,
-  customEnd: undefined,
-  setPeriod: (period) =>
-    set({
-      period,
-      ...(period !== "custom"
-        ? { customStart: undefined, customEnd: undefined }
-        : {}),
+  modules: {},
+  setPeriod: (moduleId, period) =>
+    set((s) => {
+      const cur = getModuleSlice(s.modules, moduleId);
+      return {
+        modules: {
+          ...s.modules,
+          [moduleId]: {
+            ...cur,
+            period,
+            ...(period !== "custom"
+              ? { customStart: undefined, customEnd: undefined }
+              : {}),
+          },
+        },
+      };
     }),
-  setCustomRange: (start, end) =>
-    set({ period: "custom", customStart: start, customEnd: end }),
-  getLabel: () => PERIOD_LABELS[get().period],
-  getQuery: () =>
-    buildPeriodQuery(get().period, get().customStart, get().customEnd),
+  setCustomRange: (moduleId, start, end) =>
+    set((s) => ({
+      modules: {
+        ...s.modules,
+        [moduleId]: { period: "custom", customStart: start, customEnd: end },
+      },
+    })),
+  getLabel: (moduleId = "default") =>
+    PERIOD_LABELS[getModuleSlice(get().modules, moduleId).period],
+  getQuery: (moduleId = "default") => {
+    const slice = getModuleSlice(get().modules, moduleId);
+    return buildPeriodQuery(slice.period, slice.customStart, slice.customEnd);
+  },
 }));
 
 interface StandThemeState {

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  Bot,
   GraduationCap,
   HeartHandshake,
   LayoutDashboard,
@@ -34,6 +35,14 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Overview",
     color: "bg-violet-500/15 text-violet-600",
     description: "Personal OS — focus, finance, tasks, AI insight",
+  },
+  {
+    title: "AI Coach",
+    href: "/ai-coach",
+    icon: Bot,
+    group: "Overview",
+    color: "bg-indigo-500/15 text-indigo-600",
+    description: "Chat with your Personal OS assistant",
   },
   {
     title: "Productivity",
@@ -95,6 +104,13 @@ export const NAV_GROUPS = ["Overview", "Life areas", "System"] as const;
 
 /** Deep links for header search (hub + tab). */
 export const NAV_SEARCH_EXTRAS: NavItem[] = [
+  {
+    title: "AI Coach",
+    href: "/ai-coach",
+    icon: Bot,
+    group: "Overview",
+    color: "bg-indigo-500/15 text-indigo-600",
+  },
   {
     title: "Today",
     href: "/productivity?tab=today",

@@ -34,7 +34,7 @@ const ENTRY_TYPES: JournalEntryType[] = [
 ];
 
 export function JournalModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("journal");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<JournalEntry | null>(null);

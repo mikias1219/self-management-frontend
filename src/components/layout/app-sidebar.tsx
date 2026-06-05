@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, Hexagon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useStandData } from "@/hooks/use-stand-data";
+import { notificationsApi } from "@/lib/api";
+import { hasAuthToken } from "@/lib/api/client";
 import {
   NAV_GROUPS,
   NAV_GROUP_COLORS,
@@ -17,6 +21,13 @@ export function AppSidebar() {
   const pathname = usePathname();
   const collapsed = useStandUi((s) => s.sidebarCollapsed);
   const toggleSidebar = useStandUi((s) => s.toggleSidebar);
+  const authenticated = hasAuthToken();
+
+  const { data: unreadCount = 0 } = useStandData(
+    ["notifications", "unread-count"],
+    () => notificationsApi.getUnreadCount(),
+    { enabled: authenticated, staleTime: 60_000 },
+  );
 
   return (
     <aside
@@ -98,15 +109,27 @@ export function AppSidebar() {
                         >
                           <span
                             className={cn(
-                              "flex size-8 shrink-0 items-center justify-center rounded-md transition-colors",
+                              "relative flex size-8 shrink-0 items-center justify-center rounded-md transition-colors",
                               item.color,
                               active && "ring-2 ring-primary/25",
                             )}
                           >
                             <Icon className="size-4" />
+                            {item.href === "/notifications" && unreadCount > 0 && (
+                              <Badge className="absolute -right-1 -top-1 size-4 justify-center rounded-full p-0 text-[9px]">
+                                {unreadCount > 9 ? "9+" : unreadCount}
+                              </Badge>
+                            )}
                           </span>
                           {!collapsed && (
-                            <span className="truncate">{item.title}</span>
+                            <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                              <span className="truncate">{item.title}</span>
+                              {item.href === "/notifications" && unreadCount > 0 && (
+                                <Badge variant="secondary" className="shrink-0 tabular-nums">
+                                  {unreadCount > 99 ? "99+" : unreadCount}
+                                </Badge>
+                              )}
+                            </span>
                           )}
                         </Link>
                       </li>

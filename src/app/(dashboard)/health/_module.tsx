@@ -45,7 +45,7 @@ const UNITS: Record<string, string> = {
 };
 
 export function HealthModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("health");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<HealthLog | null>(null);

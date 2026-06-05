@@ -84,6 +84,8 @@ export function FinanceDialog({
   editSavings,
   editAccount,
   editBudget,
+  editExpenseCat,
+  editIncomeCat,
   onSubmitTx,
   onSubmitAccount,
   onSubmitBudget,
@@ -108,6 +110,8 @@ export function FinanceDialog({
   editSavings?: SavingsGoal;
   editAccount?: FinanceAccount;
   editBudget?: Budget;
+  editExpenseCat?: ExpenseCategory;
+  editIncomeCat?: IncomeCategory;
   onSubmitTx: (d: Partial<FinanceTransaction>) => void;
   onSubmitAccount: (d: Partial<FinanceAccount>) => void;
   onSubmitBudget: (d: Partial<Budget>) => void;
@@ -168,8 +172,8 @@ export function FinanceDialog({
     account: editingId ? "Edit account" : "Add account",
     budget: editingId ? "Edit budget" : "Add sub-budget",
     savings: editingId ? "Edit savings goal" : "Add savings goal",
-    "expense-cat": "Add expense category",
-    "income-cat": "Add income category",
+    "expense-cat": editingId ? "Edit expense category" : "Add expense category",
+    "income-cat": editingId ? "Edit income category" : "Add income category",
     recurring: "Add recurring obligation",
   };
 
@@ -660,11 +664,16 @@ export function FinanceDialog({
               });
             }}
           >
-            <FormField label="Category name" name="name" required />
+            <FormField
+              label="Category name"
+              name="name"
+              required
+              defaultValue={editExpenseCat?.name}
+            />
             <FormSelect
               label="Classification"
               name="classificationType"
-              defaultValue="discretionary"
+              defaultValue={editExpenseCat?.classificationType ?? "discretionary"}
               options={[
                 { value: "fixed_obligation", label: "Fixed obligation (rent, bills)" },
                 { value: "variable_necessity", label: "Variable necessity (food, transport)" },
@@ -673,10 +682,28 @@ export function FinanceDialog({
               ]}
             />
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Due day (fixed only)" name="dueDay" type="number" min="1" max="31" />
-              <FormField label="Expected amount" name="expectedAmount" type="number" step="0.01" />
+              <FormField
+                label="Due day (fixed only)"
+                name="dueDay"
+                type="number"
+                min="1"
+                max="31"
+                defaultValue={editExpenseCat?.dueDay}
+              />
+              <FormField
+                label="Expected amount"
+                name="expectedAmount"
+                type="number"
+                step="0.01"
+                defaultValue={editExpenseCat?.expectedAmount}
+              />
             </div>
-            <FormField label="Color (hex)" name="color" placeholder="#ef4444" />
+            <FormField
+              label="Color (hex)"
+              name="color"
+              placeholder="#ef4444"
+              defaultValue={editExpenseCat?.color}
+            />
             <DialogFooter>
               <Button type="submit">Save</Button>
             </DialogFooter>
@@ -722,8 +749,18 @@ export function FinanceDialog({
               });
             }}
           >
-            <FormField label="Category name" name="name" required />
-            <FormField label="Color (hex)" name="color" placeholder="#22c55e" />
+            <FormField
+              label="Category name"
+              name="name"
+              required
+              defaultValue={editIncomeCat?.name}
+            />
+            <FormField
+              label="Color (hex)"
+              name="color"
+              placeholder="#22c55e"
+              defaultValue={editIncomeCat?.color}
+            />
             <DialogFooter>
               <Button type="submit">Save</Button>
             </DialogFooter>

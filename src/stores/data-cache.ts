@@ -113,6 +113,7 @@ export const useDataCache = create<DataCacheState>((set, get) => ({
 
   register: (keyParts, fn) => {
     const key = serializeKey(keyParts);
+    if (get().fetchers[key]) return;
     set((s) => ({
       fetchers: { ...s.fetchers, [key]: fn as () => Promise<unknown> },
     }));

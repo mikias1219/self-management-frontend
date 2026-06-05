@@ -27,7 +27,7 @@ import type { Habit } from "@/lib/types";
 const FREQUENCIES = ["daily", "weekly", "monthly"] as const;
 
 export function HabitsModule() {
-  const { label } = usePeriod();
+  const { label } = usePeriod("habits");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editHabit, setEditHabit] = useState<Habit | null>(null);

@@ -116,7 +116,7 @@ export function useGoalsRelations() {
 }
 
 export function useFinanceRelations() {
-  const { query } = usePeriod();
+  const { query } = usePeriod("finance");
   const authenticated = hasAuthToken();
 
   const summary = useStandData(

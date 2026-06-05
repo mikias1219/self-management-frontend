@@ -42,7 +42,7 @@ export function useStandData<T>(
     if (!entry?.loading && (entry?.data === undefined || entry?.error || stale)) {
       void useDataCache.getState().fetch(keyParts, run, { staleMs: staleTime });
     }
-  }, [key, enabled, staleTime, keyParts]);
+  }, [key, enabled, staleTime]);
 
   const refetch = useCallback(() => {
     if (!enabled) return Promise.resolve();
@@ -64,7 +64,7 @@ export function useStandMutation<TArg, TResult>(
   options?: {
     invalidateKeys?: unknown[][];
     invalidateAll?: boolean;
-    onSuccess?: (result: TResult) => void;
+    onSuccess?: (result: TResult, arg: TArg) => void;
     onError?: (error: unknown) => void;
   },
 ) {
@@ -83,7 +83,7 @@ export function useStandMutation<TArg, TResult>(
             invalidateAll: options?.invalidateAll ?? false,
           },
         );
-        options?.onSuccess?.(result as TResult);
+        options?.onSuccess?.(result as TResult, arg);
         return result;
       } catch (error) {
         options?.onError?.(error);

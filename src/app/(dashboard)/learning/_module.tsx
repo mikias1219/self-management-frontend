@@ -34,7 +34,7 @@ import { useStandUi } from "@/stores/use-stand";
 const STATUSES = ["not_started", "in_progress", "completed", "paused"] as const;
 
 export function LearningModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("learning");
   const authenticated = hasAuthToken();
   const pageTab = useStandUi((s) => s.pageTab["learning"] ?? "books");
   const setPageTab = useStandUi((s) => s.setPageTab);

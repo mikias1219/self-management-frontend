@@ -1,35 +1,48 @@
 "use client";
 
-import { useMemo } from "react";
-import { buildPeriodQuery, useStandPeriod } from "@/stores/use-stand";
+import { useCallback, useMemo } from "react";
+import {
+  buildPeriodQuery,
+  DEFAULT_PERIOD_SLICE,
+  useStandPeriod,
+} from "@/stores/use-stand";
 
-/** Period filter API — backed by useStand (Zustand), not useState. */
-export function usePeriod() {
-  const period = useStandPeriod((s) => s.period);
-  const customStart = useStandPeriod((s) => s.customStart);
-  const customEnd = useStandPeriod((s) => s.customEnd);
-  const setPeriod = useStandPeriod((s) => s.setPeriod);
-  const setCustomRange = useStandPeriod((s) => s.setCustomRange);
+const PERIOD_LABELS: Record<string, string> = {
+  day: "Today",
+  week: "This Week",
+  month: "This Month",
+  quarter: "This Quarter",
+  year: "This Year",
+  custom: "Custom",
+};
 
-  const query = useMemo(
-    () => buildPeriodQuery(period, customStart, customEnd),
-    [period, customStart, customEnd],
+/** Period filter scoped per module — changing Finance period does not affect Analytics. */
+export function usePeriod(moduleId = "default") {
+  const slice = useStandPeriod(
+    (s) => s.modules[moduleId] ?? DEFAULT_PERIOD_SLICE,
+  );
+  const setPeriodStore = useStandPeriod((s) => s.setPeriod);
+  const setCustomRangeStore = useStandPeriod((s) => s.setCustomRange);
+
+  const setPeriod = useCallback(
+    (period: typeof slice.period) => setPeriodStore(moduleId, period),
+    [moduleId, setPeriodStore],
+  );
+  const setCustomRange = useCallback(
+    (start: Date, end: Date) => setCustomRangeStore(moduleId, start, end),
+    [moduleId, setCustomRangeStore],
   );
 
-  const label = useMemo(() => {
-    const labels: Record<string, string> = {
-      day: "Today",
-      week: "This Week",
-      month: "This Month",
-      quarter: "This Quarter",
-      year: "This Year",
-      custom: "Custom",
-    };
-    return labels[period] ?? "This Week";
-  }, [period]);
+  const query = useMemo(
+    () => buildPeriodQuery(slice.period, slice.customStart, slice.customEnd),
+    [slice.period, slice.customStart, slice.customEnd],
+  );
+
+  const label = PERIOD_LABELS[slice.period] ?? "This Week";
 
   return {
-    period,
+    moduleId,
+    period: slice.period,
     setPeriod,
     setCustomRange,
     label,

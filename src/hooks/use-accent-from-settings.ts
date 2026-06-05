@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { settingsApi } from "@/lib/api";
-import { hasAuthToken } from "@/lib/api/client";
+import { useHasAuthToken } from "@/hooks/use-has-auth-token";
 import { accentFromSettings } from "@/lib/theme/accents";
 import { useThemeAccent } from "@/providers/theme-provider";
 import { useStandData } from "@/hooks/use-stand-data";
@@ -10,12 +10,12 @@ import { useStandData } from "@/hooks/use-stand-data";
 /** Applies saved accent color when the user is authenticated. */
 export function useAccentFromSettings() {
   const { setAccent } = useThemeAccent();
-  const authenticated = hasAuthToken();
+  const authenticated = useHasAuthToken();
 
   const { data } = useStandData(
     ["settings"],
     () => settingsApi.get(),
-    { enabled: authenticated, staleTime: 300_000 },
+    { enabled: authenticated === true, staleTime: 300_000 },
   );
 
   useEffect(() => {

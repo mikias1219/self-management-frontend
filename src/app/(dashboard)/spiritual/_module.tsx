@@ -34,7 +34,7 @@ const ACTIVITY_TYPES: SpiritualActivityType[] = [
 ];
 
 export function SpiritualModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("spiritual");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<SpiritualActivity | null>(null);

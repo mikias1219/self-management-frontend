@@ -39,6 +39,8 @@ import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
 import { analyticsApi } from "@/lib/api/analytics";
 import { financeApi } from "@/lib/api/finance";
+import { goalsApi, tasksApi } from "@/lib/api";
+import { taskSuggestsTransaction } from "@/lib/utils/finance-hints";
 import { settingsApi } from "@/lib/api/settings";
 import { hasAuthToken } from "@/lib/api/client";
 import type {
@@ -83,7 +85,7 @@ function classificationLabel(
 }
 
 export function FinanceModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("finance");
   const authenticated = hasAuthToken();
   const pageTab = useStandUi((s) => s.pageTab["finance"] ?? "overview");
   const setPageTab = useStandUi((s) => s.setPageTab);
@@ -161,6 +163,14 @@ export function FinanceModule() {
   const userSettings = useStandData(["settings"], () => settingsApi.get(), {
     enabled: authenticated && onOverview,
   });
+  const linkedGoals = useStandData(["goals"], () => goalsApi.getAll(), {
+    enabled: authenticated,
+    staleTime: 60_000,
+  });
+  const linkedTasks = useStandData(["tasks"], () => tasksApi.getAll(), {
+    enabled: authenticated,
+    staleTime: 60_000,
+  });
 
   const accountList = accounts.data ?? [];
   const expenseCatList = expenseCats.data ?? [];
@@ -169,28 +179,56 @@ export function FinanceModule() {
 
   const financeLinks = useMemo((): RelationLink[] => {
     const t = s?.totals;
-    if (!t) return [];
-    return [
-      {
-        label: "Transactions",
-        href: "/finance",
-        value: t.transactionCount,
-        color: colorForModuleKey("transactions"),
-      },
-      {
-        label: "Savings rate",
-        href: "/finance",
-        value: `${t.savingsRate}%`,
-        color: "#22c55e",
-      },
-      {
-        label: "Budgets tracked",
-        href: "/finance",
-        value: s?.budgets.length ?? 0,
-        color: "#f59e0b",
-      },
-    ];
-  }, [s?.totals, s?.budgets.length]);
+    const goalList = linkedGoals.data ?? [];
+    const taskList = linkedTasks.data ?? [];
+    const financeGoalCount = goalList.filter((g) => g.lifeArea === "finance").length;
+    const financeTaskCount = taskList.filter(
+      (task) =>
+        task.taskStatus !== "done" &&
+        task.taskStatus !== "cancelled" &&
+        taskSuggestsTransaction(task),
+    ).length;
+    const links: RelationLink[] = [];
+    if (t) {
+      links.push(
+        {
+          label: "Transactions",
+          href: "/life?tab=finance",
+          value: t.transactionCount,
+          color: colorForModuleKey("transactions"),
+        },
+        {
+          label: "Savings rate",
+          href: "/life?tab=finance",
+          value: `${t.savingsRate}%`,
+          color: "#22c55e",
+        },
+        {
+          label: "Budgets tracked",
+          href: "/life?tab=finance",
+          value: s?.budgets.length ?? 0,
+          color: "#f59e0b",
+        },
+      );
+    }
+    if (financeGoalCount > 0) {
+      links.push({
+        label: "Linked goals",
+        href: "/productivity?tab=goals",
+        value: financeGoalCount,
+        color: colorForModuleKey("goals"),
+      });
+    }
+    if (financeTaskCount > 0) {
+      links.push({
+        label: "Tasks with financial impact",
+        href: "/productivity?tab=tasks",
+        value: financeTaskCount,
+        color: colorForModuleKey("tasks"),
+      });
+    }
+    return links;
+  }, [s?.totals, s?.budgets.length, linkedGoals.data, linkedTasks.data]);
 
   const savingsDisplay = useMemo(() => {
     const goals = savings.data ?? [];
@@ -372,8 +410,28 @@ export function FinanceModule() {
       invalidateKeys: [["finance", "expense-cats"], ...invalidateFinance],
       onSuccess: () => {
         setDialogMode(null);
+        setEditing(null);
         toast.success("Category created");
       },
+    },
+  );
+  const updateExpenseCat = useStandMutation(
+    ({ id, data }: { id: string; data: Partial<ExpenseCategory> }) =>
+      financeApi.expenseCategories.update(id, data),
+    {
+      invalidateKeys: [["finance", "expense-cats"], ...invalidateFinance],
+      onSuccess: () => {
+        setDialogMode(null);
+        setEditing(null);
+        toast.success("Category updated");
+      },
+    },
+  );
+  const deleteExpenseCat = useStandMutation(
+    (id: string) => financeApi.expenseCategories.remove(id),
+    {
+      invalidateKeys: [["finance", "expense-cats"], ...invalidateFinance],
+      onSuccess: () => toast.success("Category deleted"),
     },
   );
   const createIncomeCat = useStandMutation(
@@ -382,8 +440,28 @@ export function FinanceModule() {
       invalidateKeys: [["finance", "income-cats"], ...invalidateFinance],
       onSuccess: () => {
         setDialogMode(null);
+        setEditing(null);
         toast.success("Category created");
       },
+    },
+  );
+  const updateIncomeCat = useStandMutation(
+    ({ id, data }: { id: string; data: Partial<IncomeCategory> }) =>
+      financeApi.incomeCategories.update(id, data),
+    {
+      invalidateKeys: [["finance", "income-cats"], ...invalidateFinance],
+      onSuccess: () => {
+        setDialogMode(null);
+        setEditing(null);
+        toast.success("Category updated");
+      },
+    },
+  );
+  const deleteIncomeCat = useStandMutation(
+    (id: string) => financeApi.incomeCategories.remove(id),
+    {
+      invalidateKeys: [["finance", "income-cats"], ...invalidateFinance],
+      onSuccess: () => toast.success("Category deleted"),
     },
   );
   const createRecurring = useStandMutation(
@@ -453,6 +531,22 @@ export function FinanceModule() {
           r.transactionType === "income"
             ? catName(r.categoryId, "income")
             : catName(r.categoryId, "expense"),
+      },
+      {
+        key: "class",
+        header: "Class",
+        cell: (r) => {
+          if (r.transactionType !== "expense") return "—";
+          const cat = expenseCatList.find((c) => c.id === r.categoryId);
+          const label = classificationLabel(cat?.classificationType);
+          return label ? (
+            <Badge variant="outline" className="text-[10px] font-normal capitalize">
+              {label}
+            </Badge>
+          ) : (
+            "—"
+          );
+        },
       },
       { key: "desc", header: "Description", cell: (r) => r.description ?? "—" },
     ],
@@ -1233,7 +1327,7 @@ export function FinanceModule() {
               {expenseCatList.map((c) => (
                 <span
                   key={c.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm"
                   style={
                     c.color ? { borderColor: c.color, color: c.color } : undefined
                   }
@@ -1244,6 +1338,27 @@ export function FinanceModule() {
                       {classificationLabel(c.classificationType)}
                     </Badge>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-xs"
+                    onClick={() => {
+                      setEditing({ type: "expense-cat", id: c.id });
+                      setDialogMode("expense-cat");
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-xs text-destructive"
+                    onClick={() =>
+                      confirmDelete("category", () => deleteExpenseCat.mutate(c.id))
+                    }
+                  >
+                    Delete
+                  </Button>
                 </span>
               ))}
             </div>
@@ -1263,12 +1378,33 @@ export function FinanceModule() {
               {incomeCatList.map((c) => (
                 <span
                   key={c.id}
-                  className="rounded-full border px-3 py-1 text-sm"
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm"
                   style={
                     c.color ? { borderColor: c.color, color: c.color } : undefined
                   }
                 >
                   {c.name}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-xs"
+                    onClick={() => {
+                      setEditing({ type: "income-cat", id: c.id });
+                      setDialogMode("income-cat");
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-xs text-destructive"
+                    onClick={() =>
+                      confirmDelete("category", () => deleteIncomeCat.mutate(c.id))
+                    }
+                  >
+                    Delete
+                  </Button>
                 </span>
               ))}
             </div>
@@ -1325,6 +1461,16 @@ export function FinanceModule() {
             ? (budgets.data ?? []).find((b) => b.id === editing.id)
             : undefined
         }
+        editExpenseCat={
+          editing?.type === "expense-cat"
+            ? expenseCatList.find((c) => c.id === editing.id)
+            : undefined
+        }
+        editIncomeCat={
+          editing?.type === "income-cat"
+            ? incomeCatList.find((c) => c.id === editing.id)
+            : undefined
+        }
         onSubmitTx={(data) => {
           if (editing?.type === "transaction") {
             updateTx.mutate({ id: editing.id, data });
@@ -1353,8 +1499,20 @@ export function FinanceModule() {
             createSavings.mutate(data);
           }
         }}
-        onSubmitExpenseCat={(data) => createExpenseCat.mutate(data)}
-        onSubmitIncomeCat={(data) => createIncomeCat.mutate(data)}
+        onSubmitExpenseCat={(data) => {
+          if (editing?.type === "expense-cat") {
+            updateExpenseCat.mutate({ id: editing.id, data });
+          } else {
+            createExpenseCat.mutate(data);
+          }
+        }}
+        onSubmitIncomeCat={(data) => {
+          if (editing?.type === "income-cat") {
+            updateIncomeCat.mutate({ id: editing.id, data });
+          } else {
+            createIncomeCat.mutate(data);
+          }
+        }}
         onSubmitRecurring={(data) => createRecurring.mutate(data)}
       />
       )}

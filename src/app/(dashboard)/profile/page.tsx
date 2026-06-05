@@ -74,7 +74,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Profile</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -93,14 +93,13 @@ export default function ProfilePage() {
       </div>
 
       <PasswordForm />
-      <ResetPasswordForm />
     </div>
   );
 }
 
 function ProfilePageSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div className="space-y-2">
         <Skeleton className="h-7 w-24" />
         <Skeleton className="h-4 w-full max-w-md" />
@@ -532,71 +531,3 @@ function PasswordForm() {
   );
 }
 
-function ResetPasswordForm() {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-
-  const mutation = useStandMutation(authApi.resetPassword, {
-    invalidateAll: false,
-    onSuccess: () => {
-      toast.success("Password has been reset");
-      setNewPassword("");
-      setConfirm("");
-    },
-    onError: () => toast.error("Could not reset password"),
-  });
-
-  const valid = newPassword.length >= 8 && newPassword === confirm;
-
-  return (
-    <Card className="border shadow-sm border-amber-200 bg-amber-50/30">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-amber-700">
-          <KeyRound className="size-4" />
-          Forgot your current password?
-        </CardTitle>
-        <CardDescription>
-          You can set a new password directly. This is a quick reset (no email
-          verification). Stronger recovery will be added later.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid gap-4 sm:max-w-md"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!valid) {
-              toast.error("Passwords must match and be at least 8 characters");
-              return;
-            }
-            void mutation.mutate({ newPassword });
-          }}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="resetNew">New password</Label>
-            <Input
-              id="resetNew"
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="resetConfirm">Confirm new password</Label>
-            <Input
-              id="resetConfirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
-          </div>
-          <Button type="submit" disabled={mutation.isPending || !valid}>
-            {mutation.isPending ? "Resetting…" : "Reset password"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}

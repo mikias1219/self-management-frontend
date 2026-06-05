@@ -39,7 +39,7 @@ const LEVELS: GoalLevel[] = [
 ];
 
 export function GoalsModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("goals");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);

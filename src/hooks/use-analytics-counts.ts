@@ -8,7 +8,7 @@ import { useStandData } from "@/hooks/use-stand-data";
 
 /** Single shared analytics fetch for all dashboard widgets. */
 export function useAnalyticsCounts() {
-  const { query } = usePeriod();
+  const { query } = usePeriod("analytics");
   const stableQuery = useMemo(
     () => query,
     [query.period, query.startDate, query.endDate],

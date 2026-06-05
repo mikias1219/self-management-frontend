@@ -27,14 +27,22 @@ import type { DailyReview } from "@/lib/types";
 import { filterByDateField } from "@/lib/utils/period";
 
 export function DailyReviewsModule() {
-  const { query, label } = usePeriod();
+  const { query, label } = usePeriod("daily-reviews");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<DailyReview | null>(null);
 
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
   const { data: all, isLoading } = useStandData(
     ["daily-reviews"],
     () => dailyReviewsApi.getAll(),
+    { enabled: authenticated },
+  );
+
+  const { data: todayReview } = useStandData(
+    ["daily-reviews", "today"],
+    () => dailyReviewsApi.getToday(),
     { enabled: authenticated },
   );
 
@@ -67,10 +75,16 @@ export function DailyReviewsModule() {
     }));
 
   const save = useStandMutation(
-    (p: { id?: string; data: Partial<DailyReview> }) =>
-      p.id ? dailyReviewsApi.update(p.id, p.data) : dailyReviewsApi.create(p.data),
+    (p: { id?: string; data: Partial<DailyReview> }) => {
+      if (!p.id && p.data.reviewDate === todayStr) {
+        return dailyReviewsApi.upsertToday(p.data);
+      }
+      return p.id
+        ? dailyReviewsApi.update(p.id, p.data)
+        : dailyReviewsApi.create(p.data);
+    },
     {
-      invalidateKeys: [["daily-reviews"], ["dashboard"]],
+      invalidateKeys: [["daily-reviews"], ["daily-reviews", "today"], ["dashboard"]],
       onSuccess: () => {
         setOpen(false);
         setEdit(null);
@@ -123,8 +137,14 @@ export function DailyReviewsModule() {
       icon={Sun}
       iconClassName="bg-indigo-500/15 text-indigo-600"
       actions={
-        <Button size="sm" onClick={() => { setEdit(null); setOpen(true); }}>
-          <Plus className="size-4" /> New review
+        <Button
+          size="sm"
+          onClick={() => {
+            setEdit(todayReview ?? null);
+            setOpen(true);
+          }}
+        >
+          <Plus className="size-4" /> {todayReview ? "Edit today's review" : "New review"}
         </Button>
       }
     >

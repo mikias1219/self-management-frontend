@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { CheckCircle2, CheckSquare, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { ModuleShell } from "@/components/shared/module-shell";
@@ -13,6 +14,7 @@ import { ModuleRelations } from "@/components/shared/module-relations";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatGrid } from "@/components/shared/stat-grid";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,7 +28,8 @@ import { Label } from "@/components/ui/label";
 import { useTasksRelations } from "@/hooks/use-module-relations";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { analyticsApi, goalsApi, tasksApi } from "@/lib/api";
+import { activityLogsApi, analyticsApi, goalsApi, tasksApi } from "@/lib/api";
+import { taskSuggestsTransaction } from "@/lib/utils/finance-hints";
 import { LIFE_AREAS } from "@/lib/types/life-area";
 import { hasAuthToken } from "@/lib/api/client";
 import type { Task } from "@/lib/types";
@@ -47,7 +50,8 @@ function formatMinutes(m: number) {
 
 export function TasksModule() {
   const embedded = useHubEmbedded();
-  const { query, label } = usePeriod();
+  const router = useRouter();
+  const { query, label } = usePeriod("tasks");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -78,6 +82,25 @@ export function TasksModule() {
     ["analytics", "task-intelligence"],
     () => analyticsApi.getTaskIntelligence(),
     { enabled: authenticated },
+  );
+
+  const { data: recentActivity } = useStandData(
+    ["activity-logs", "tasks-finance-hints"],
+    () => activityLogsApi.getByPeriod({ period: "week" }),
+    { enabled: authenticated, staleTime: 60_000 },
+  );
+
+  const financeHints = useMemo(
+    () =>
+      (recentActivity ?? [])
+        .filter(
+          (log) =>
+            log.module === "tasks" &&
+            log.action === "completed" &&
+            log.metadata?.suggestRecordTransaction === true,
+        )
+        .slice(0, 3),
+    [recentActivity],
   );
 
   const stats = useMemo(() => {
@@ -157,13 +180,21 @@ export function TasksModule() {
   });
 
   const report = useStandMutation(
-    (p: { id: string; timeSpentMinutes: number }) =>
+    (p: { id: string; timeSpentMinutes: number; hintTask?: Task }) =>
       tasksApi.report(p.id, { timeSpentMinutes: p.timeSpentMinutes }),
     {
       invalidateKeys: invalidate,
-      onSuccess: () => {
+      onSuccess: (_, vars) => {
         setReportTask(null);
         toast.success("Achievement reported — visible on dashboard");
+        if (vars.hintTask && taskSuggestsTransaction(vars.hintTask)) {
+          toast("Record this payment in Finance?", {
+            action: {
+              label: "Open Finance",
+              onClick: () => router.push("/life?tab=finance"),
+            },
+          });
+        }
       },
     },
   );
@@ -299,6 +330,25 @@ export function TasksModule() {
         </Button>
       }
     >
+      {financeHints.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+            <p>
+              <span className="font-medium">Finance follow-up:</span>{" "}
+              {financeHints.length} completed task
+              {financeHints.length === 1 ? "" : "s"} may need a transaction recorded.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push("/life?tab=finance")}
+            >
+              Record in Finance
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <StatGrid>
         <StatCard title="Open tasks" value={stats.pending} loading={isLoading} />
         <StatCard title="Overdue" value={stats.overdue} loading={isLoading} />
@@ -554,7 +604,11 @@ export function TasksModule() {
                   toast.error("Enter valid minutes");
                   return;
                 }
-                report.mutate({ id: reportTask.id, timeSpentMinutes: n });
+                report.mutate({
+                  id: reportTask.id,
+                  timeSpentMinutes: n,
+                  hintTask: reportTask,
+                });
               }}
               disabled={report.isPending}
             >
