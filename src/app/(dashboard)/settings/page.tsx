@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FinanceSettingsCard } from "@/components/settings/finance-settings-card";
 import { GoogleCalendarSettings } from "@/components/settings/google-calendar-settings";
 import { settingsApi } from "@/lib/api";
-import { hasAuthToken } from "@/lib/api/client";
+import { useHasAuthToken } from "@/hooks/use-has-auth-token";
 import {
   ACCENT_COLORS,
   accentFromSettings,
@@ -14,16 +14,17 @@ import {
 } from "@/lib/theme/accents";
 import { useThemeAccent } from "@/providers/theme-provider";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 
 export default function SettingsPage() {
-  const authenticated = hasAuthToken();
+  const authenticated = useHasAuthToken();
   const { accent, setAccent } = useThemeAccent();
 
   const { data, isLoading } = useStandData(
     ["settings"],
     () => settingsApi.get(),
-    { enabled: authenticated },
+    { enabled: authenticated === true },
   );
 
   useEffect(() => {
@@ -47,13 +48,20 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {!authenticated && (
+      {authenticated === null && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+
+      {authenticated === false && (
         <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
           Sign in to manage settings.
         </div>
       )}
 
-      {authenticated && (
+      {authenticated === true && (
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <FinanceSettingsCard enabled={authenticated} />
           <Card className="border shadow-sm">

@@ -27,10 +27,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { authApi, dashboardApi } from "@/lib/api";
-import { hasAuthToken } from "@/lib/api/client";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
+import { useHasAuthToken } from "@/hooks/use-has-auth-token";
 import type { User } from "@/lib/types";
 import { formatMoney } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
@@ -46,19 +47,23 @@ function initials(name?: string) {
 }
 
 export default function ProfilePage() {
-  const authenticated = hasAuthToken();
+  const authenticated = useHasAuthToken();
 
   const { data: user, isLoading } = useStandData(
     ["auth", "me"],
     () => authApi.me(),
-    { enabled: authenticated },
+    { enabled: authenticated === true },
   );
 
   const { data: overview } = useStandData(
     ["dashboard", "pos"],
     () => dashboardApi.getOverview(),
-    { enabled: authenticated },
+    { enabled: authenticated === true },
   );
+
+  if (authenticated === null) {
+    return <ProfilePageSkeleton />;
+  }
 
   if (!authenticated) {
     return (
@@ -89,6 +94,27 @@ export default function ProfilePage() {
 
       <PasswordForm />
       <ResetPasswordForm />
+    </div>
+  );
+}
+
+function ProfilePageSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-24" />
+        <Skeleton className="h-4 w-full max-w-md" />
+      </div>
+      <Skeleton className="h-36 w-full rounded-xl" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-80 w-full rounded-xl" />
+        <Skeleton className="h-80 w-full rounded-xl" />
+      </div>
     </div>
   );
 }
