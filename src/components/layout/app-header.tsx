@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, Settings as SettingsIcon, User, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,20 +24,22 @@ interface AppHeaderProps {
 export function AppHeader({ title }: AppHeaderProps) {
   const router = useRouter();
   const authenticated = hasAuthToken();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const { data: user } = useStandData(
     ["auth", "me"],
     () => authApi.me(),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 120_000 },
   );
 
-  const { data: notifications } = useStandData(
-    ["notifications"],
-    () => notificationsApi.getAll(),
-    { enabled: authenticated },
+  const { data: unreadCount = 0 } = useStandData(
+    ["notifications", "unread-count"],
+    () => notificationsApi.getUnreadCount(),
+    {
+      enabled: authenticated && notificationsEnabled,
+      staleTime: 60_000,
+    },
   );
-
-  const unread = (notifications ?? []).filter((n) => !n.isRead).length;
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm">
@@ -51,12 +54,14 @@ export function AppHeader({ title }: AppHeaderProps) {
         size="icon-sm"
         className="relative"
         onClick={() => router.push("/notifications")}
+        onMouseEnter={() => setNotificationsEnabled(true)}
+        onFocus={() => setNotificationsEnabled(true)}
         aria-label="Notifications"
       >
         <Bell className="size-4" />
-        {unread > 0 && (
+        {unreadCount > 0 && (
           <Badge className="absolute -right-0.5 -top-0.5 size-4 justify-center rounded-full p-0 text-[9px]">
-            {unread > 9 ? "9+" : unread}
+            {unreadCount > 9 ? "9+" : unreadCount}
           </Badge>
         )}
       </Button>

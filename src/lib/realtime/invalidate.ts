@@ -33,7 +33,6 @@ export function invalidateFromRealtime(payload?: RealtimeUpdate): void {
   const cache = useDataCache.getState();
 
   if (!payload?.module) {
-    cache.refetchAllRegistered();
     return;
   }
 

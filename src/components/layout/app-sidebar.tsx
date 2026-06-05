@@ -86,6 +86,7 @@ export function AppSidebar() {
                       <li key={item.href}>
                         <Link
                           href={item.href}
+                          prefetch={false}
                           title={collapsed ? item.title : undefined}
                           className={cn(
                             "group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium transition-all",

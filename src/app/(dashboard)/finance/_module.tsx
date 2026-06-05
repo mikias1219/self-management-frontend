@@ -107,7 +107,11 @@ export function FinanceModule() {
   const summary = useStandData(
     ["finance", "summary", query],
     () => financeApi.getSummary(query),
-    { enabled: authenticated },
+    {
+      enabled:
+        authenticated &&
+        (onOverview || onObligations || onCycle || dialogOpen),
+    },
   );
   const financeIntel = useStandData(
     ["analytics", "finance-intelligence", query],

@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { useDataCache, serializeKey } from "@/stores/data-cache";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { DEFAULT_STALE_MS, useDataCache, serializeKey } from "@/stores/data-cache";
 
 interface UseStandDataOptions {
   enabled?: boolean;
+  /** How long cached data stays fresh before refetching (ms). Default 30s. */
+  staleTime?: number;
 }
 
 export function useStandData<T>(
@@ -13,6 +15,7 @@ export function useStandData<T>(
   options?: UseStandDataOptions,
 ) {
   const enabled = options?.enabled ?? true;
+  const staleTime = options?.staleTime ?? DEFAULT_STALE_MS;
   const key = serializeKey(keyParts);
   const fetchRef = useRef(fetchFn);
   fetchRef.current = fetchFn;
@@ -34,10 +37,12 @@ export function useStandData<T>(
     const run = () => fetchRef.current();
     useDataCache.getState().register(keyParts, run);
     const entry = useDataCache.getState().entries[key];
-    if (!entry?.loading && (entry?.data === undefined || entry?.error)) {
-      void useDataCache.getState().fetch(keyParts, run);
+    const stale =
+      !entry?.fetchedAt || Date.now() - entry.fetchedAt >= staleTime;
+    if (!entry?.loading && (entry?.data === undefined || entry?.error || stale)) {
+      void useDataCache.getState().fetch(keyParts, run, { staleMs: staleTime });
     }
-  }, [key, enabled]);
+  }, [key, enabled, staleTime, keyParts]);
 
   const refetch = useCallback(() => {
     if (!enabled) return Promise.resolve();
@@ -46,7 +51,8 @@ export function useStandData<T>(
 
   return {
     data: snapshot.data,
-    isLoading: snapshot.loading,
+    isLoading: snapshot.loading && snapshot.data === undefined,
+    isFetching: snapshot.loading,
     isError: !!snapshot.error,
     error: snapshot.error,
     refetch,
@@ -57,18 +63,18 @@ export function useStandMutation<TArg, TResult>(
   mutationFn: (arg: TArg) => Promise<TResult>,
   options?: {
     invalidateKeys?: unknown[][];
-    /** Refetch all registered API data (default false; prefer invalidateKeys). */
     invalidateAll?: boolean;
     onSuccess?: (result: TResult) => void;
     onError?: (error: unknown) => void;
   },
 ) {
-  const isPending = useDataCache((s) => s.pendingMutations > 0);
+  const [isPending, setIsPending] = useState(false);
   const mutationRef = useRef(mutationFn);
   mutationRef.current = mutationFn;
 
   const mutate = useCallback(
     async (arg: TArg) => {
+      setIsPending(true);
       try {
         const result = await useDataCache.getState().runMutation(
           () => mutationRef.current(arg),
@@ -82,6 +88,8 @@ export function useStandMutation<TArg, TResult>(
       } catch (error) {
         options?.onError?.(error);
         return undefined;
+      } finally {
+        setIsPending(false);
       }
     },
     [options],

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useLayoutEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { useAccentFromSettings } from "@/hooks/use-accent-from-settings";
 import { hasAuthToken } from "@/lib/api/client";
@@ -12,29 +11,12 @@ export default function ProtectedDashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const setAuthReady = useStandUi((s) => s.setAuthReady);
   useAccentFromSettings();
 
   useLayoutEffect(() => {
     setAuthReady(hasAuthToken());
   }, [setAuthReady]);
-
-  useEffect(() => {
-    if (!hasAuthToken()) {
-      setAuthReady(false);
-      router.replace(`/login?from=${encodeURIComponent(pathname)}`);
-    }
-  }, [router, pathname, setAuthReady]);
-
-  if (!hasAuthToken()) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Loading LifeOS...
-      </div>
-    );
-  }
 
   return <DashboardLayout>{children}</DashboardLayout>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { HubProvider } from "@/components/hubs/hub-context";
 import {
   HubLayout,
@@ -19,8 +19,41 @@ interface HubPageShellProps {
   tabGroups?: HubTabGroup[];
   defaultTab: string;
   panels: Record<string, React.ComponentType>;
-  /** Nested in dashboard — tabs only, no duplicate hub header */
   compact?: boolean;
+}
+
+/** Keep visited hub panels mounted (hidden) to avoid remount cost on tab return. */
+function HubVisitedPanels({
+  activeTab,
+  panels,
+}: {
+  activeTab: string;
+  panels: Record<string, React.ComponentType>;
+}) {
+  const [visited, setVisited] = useState<string[]>([activeTab]);
+
+  useEffect(() => {
+    setVisited((prev) =>
+      prev.includes(activeTab) ? prev : [...prev, activeTab],
+    );
+  }, [activeTab]);
+
+  return (
+    <>
+      {visited.map((tabId) => {
+        const Panel = panels[tabId];
+        if (!Panel) return null;
+        const isActive = tabId === activeTab;
+        return (
+          <div key={tabId} hidden={!isActive} aria-hidden={!isActive}>
+            <HubProvider>
+              <Panel />
+            </HubProvider>
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 function HubPageInner({
@@ -34,15 +67,12 @@ function HubPageInner({
   panels,
   compact,
 }: HubPageShellProps) {
-  const Panel = (tab: string) => {
-    const C = panels[tab];
-    if (!C) return null;
-    return (
-      <HubProvider>
-        <C />
-      </HubProvider>
-    );
-  };
+  const renderPanels = useCallback(
+    (activeTab: string) => (
+      <HubVisitedPanels activeTab={activeTab} panels={panels} />
+    ),
+    [panels],
+  );
 
   return (
     <HubLayout
@@ -55,7 +85,7 @@ function HubPageInner({
       defaultTab={defaultTab}
       compact={compact}
     >
-      {(tab) => Panel(tab)}
+      {renderPanels}
     </HubLayout>
   );
 }

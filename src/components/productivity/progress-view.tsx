@@ -142,22 +142,13 @@ export function ProgressView() {
   const authenticated = hasAuthToken();
   const [period, setPeriod] = useState<AnalyticsPeriod>("week");
 
-  const { data: allMetrics, isLoading: loadingAll } = useStandData(
+  const { data: allMetrics, isLoading } = useStandData(
     ["productivity", "metrics"],
     () => productivityApi.getMetrics(),
-    { enabled: authenticated },
-  );
-
-  const { data: periodMetrics, isLoading: loadingPeriod } = useStandData(
-    ["productivity", "metrics", period],
-    () => productivityApi.getMetrics(period),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
 
   const m = useMemo(() => {
-    if (periodMetrics && "successScore" in periodMetrics) {
-      return periodMetrics as PeriodProductivityMetrics;
-    }
     const all = allMetrics as ProductivityMetricsAll | undefined;
     if (!all) return null;
     const map: Record<AnalyticsPeriod, keyof ProductivityMetricsAll> = {
@@ -168,10 +159,8 @@ export function ProgressView() {
       year: "yearly",
       custom: "weekly",
     };
-    return all[map[period]];
-  }, [periodMetrics, allMetrics, period]);
-
-  const isLoading = loadingAll || loadingPeriod;
+    return all[map[period]] as PeriodProductivityMetrics;
+  }, [allMetrics, period]);
 
   if (!authenticated) {
     return (

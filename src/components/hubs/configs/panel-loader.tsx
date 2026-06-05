@@ -21,6 +21,6 @@ export function loadPanel<T extends Record<string, ComponentType>>(
 ) {
   return dynamic(
     () => loader().then((mod) => ({ default: mod[exportName] })),
-    { loading: () => <PanelSkeleton /> },
+    { loading: () => <PanelSkeleton />, ssr: false },
   );
 }

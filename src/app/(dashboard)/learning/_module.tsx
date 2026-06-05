@@ -41,11 +41,27 @@ export function LearningModule() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const books = useStandData(["learning", "books"], () => learningApi.books.getAll(), { enabled: authenticated });
-  const courses = useStandData(["learning", "courses"], () => learningApi.courses.getAll(), { enabled: authenticated });
-  const skills = useStandData(["learning", "skills"], () => learningApi.skills.getAll(), { enabled: authenticated });
-  const projects = useStandData(["learning", "projects"], () => learningApi.projects.getAll(), { enabled: authenticated });
-  const sessions = useStandData(["learning", "sessions"], () => learningApi.studySessions.getAll(), { enabled: authenticated });
+  const onBooks = pageTab === "books";
+  const onCourses = pageTab === "courses";
+  const onSkills = pageTab === "skills";
+  const onProjects = pageTab === "projects";
+  const onSessions = pageTab === "sessions";
+
+  const books = useStandData(["learning", "books"], () => learningApi.books.getAll(), {
+    enabled: authenticated && onBooks,
+  });
+  const courses = useStandData(["learning", "courses"], () => learningApi.courses.getAll(), {
+    enabled: authenticated && onCourses,
+  });
+  const skills = useStandData(["learning", "skills"], () => learningApi.skills.getAll(), {
+    enabled: authenticated && onSkills,
+  });
+  const projects = useStandData(["learning", "projects"], () => learningApi.projects.getAll(), {
+    enabled: authenticated && onProjects,
+  });
+  const sessions = useStandData(["learning", "sessions"], () => learningApi.studySessions.getAll(), {
+    enabled: authenticated && (onSessions || onBooks || onCourses),
+  });
 
   const filteredSessions = useMemo(
     () => filterByDateField(sessions.data ?? [], query, (s) => s.sessionDate),

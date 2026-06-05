@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtime/socket";
-import { useDataCache } from "@/stores/data-cache";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -38,7 +37,6 @@ function LoginFormFields() {
   const mutation = useStandMutation(authApi.login, {
     onSuccess: () => {
       getRealtimeSocket();
-      useDataCache.getState().refetchAllRegistered();
       router.push("/");
     },
   });
@@ -81,7 +79,6 @@ function RegisterFormFields() {
   const mutation = useStandMutation(authApi.register, {
     onSuccess: () => {
       getRealtimeSocket();
-      useDataCache.getState().refetchAllRegistered();
       router.push("/");
     },
   });

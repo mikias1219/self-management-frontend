@@ -15,7 +15,7 @@ export function useAccentFromSettings() {
   const { data } = useStandData(
     ["settings"],
     () => settingsApi.get(),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 300_000 },
   );
 
   useEffect(() => {

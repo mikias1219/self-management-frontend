@@ -14,16 +14,18 @@ import type { ModuleCounts } from "@/lib/types";
 
 export function useTasksRelations() {
   const authenticated = hasAuthToken();
-  const { query } = usePeriod();
 
   const tasks = useStandData(["tasks"], () => tasksApi.getAll(), {
     enabled: authenticated,
+    staleTime: 60_000,
   });
   const goals = useStandData(["goals"], () => goalsApi.getAll(), {
     enabled: authenticated,
+    staleTime: 60_000,
   });
   const habits = useStandData(["habits"], () => habitsApi.getAll(), {
     enabled: authenticated,
+    staleTime: 60_000,
   });
 
   const links = useMemo((): RelationLink[] => {
@@ -64,13 +66,7 @@ export function useTasksRelations() {
     ];
   }, [tasks.data, goals.data, habits.data]);
 
-  const finance = useStandData(
-    ["finance", "summary", query],
-    () => financeApi.getSummary(query),
-    { enabled: authenticated },
-  );
-
-  return { links, financeSummary: finance.data };
+  return { links };
 }
 
 export function useGoalsRelations() {
@@ -126,7 +122,7 @@ export function useFinanceRelations() {
   const summary = useStandData(
     ["finance", "summary", query],
     () => financeApi.getSummary(query),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
 
   const links = useMemo((): RelationLink[] => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthSync } from "@/components/auth/auth-sync";
 import { dmSans, jetbrainsMono } from "@/lib/fonts";
 import { RealtimeProvider } from "@/providers/realtime-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -23,6 +24,7 @@ export default function RootLayout({
         className={`${dmSans.variable} ${jetbrainsMono.variable} min-h-screen font-sans antialiased`}
       >
         <ThemeProvider>
+          <AuthSync />
           <RealtimeProvider>
             <TooltipProvider>
               {children}

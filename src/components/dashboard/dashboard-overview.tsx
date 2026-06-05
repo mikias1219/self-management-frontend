@@ -7,7 +7,6 @@ import {
   CheckSquare,
   Clock,
   Flame,
-  PiggyBank,
   Sparkles,
   Target,
   TrendingUp,
@@ -16,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { HubOverview } from "@/components/dashboard/hub-overview";
 import { authApi, dashboardApi, financeApi, productivityApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
@@ -38,28 +38,29 @@ function formatMinutes(m: number) {
   return `${r}m`;
 }
 
-/** Personal OS dashboard — one calm, scannable view of the day. */
+/** Personal OS dashboard — progressive sections, no full-page blocking. */
 export function DashboardOverview() {
   const authenticated = hasAuthToken();
 
-  const { data, isLoading } = useStandData(
+  const { data, isLoading: overviewLoading } = useStandData(
     ["dashboard", "pos"],
     () => dashboardApi.getOverview(),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
   const { data: today } = useStandData(
     ["productivity", "schedule", "today"],
     () => productivityApi.getSchedule({ scope: "today" }),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
   const { data: user } = useStandData(["auth", "me"], () => authApi.me(), {
     enabled: authenticated,
+    staleTime: 120_000,
   });
 
-  const { data: budgets } = useStandData(
+  const { data: budgets, isLoading: budgetsLoading } = useStandData(
     ["finance", "budgets"],
     () => financeApi.budgets.getAll(),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
 
   if (!authenticated) {
@@ -72,64 +73,43 @@ export function DashboardOverview() {
     );
   }
 
-  if (isLoading || !data) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="h-24" />
-            </Card>
-          ))}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {[1, 2].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="h-48" />
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const currency = data.financialSnapshot.currency;
-  const success = today?.todaySuccess;
-  const monthNet =
-    data.financialSnapshot.monthlyIncome - data.financialSnapshot.monthlyExpense;
   const firstName = user?.displayName?.split(" ")[0];
+  const success = today?.todaySuccess;
+  const currency = data?.financialSnapshot.currency ?? "ETB";
 
-  const kpis = [
-    {
-      label: "Today's score",
-      value: `${success?.successScore ?? 0}%`,
-      icon: TrendingUp,
-      tint: "text-violet-600",
-      progress: success?.successScore ?? 0,
-    },
-    {
-      label: "Tasks done",
-      value: `${success?.tasksCompleted ?? 0}/${success?.tasksPlanned ?? 0}`,
-      icon: CheckSquare,
-      tint: "text-sky-600",
-    },
-    {
-      label: "Focused time",
-      value: formatMinutes(success?.minutesAchieved ?? 0),
-      sub: `of ${formatMinutes(success?.minutesPlanned ?? 0)} planned`,
-      icon: Clock,
-      tint: "text-amber-600",
-    },
-    {
-      label: "Net balance",
-      value: formatMoney(data.financialSnapshot.netBalance, currency),
-      icon: Wallet,
-      tint:
-        data.financialSnapshot.netBalance >= 0
-          ? "text-emerald-600"
-          : "text-rose-600",
-    },
-  ];
+  const kpis = data
+    ? [
+        {
+          label: "Today's score",
+          value: `${success?.successScore ?? 0}%`,
+          icon: TrendingUp,
+          tint: "text-violet-600",
+          progress: success?.successScore ?? 0,
+        },
+        {
+          label: "Tasks done",
+          value: `${success?.tasksCompleted ?? 0}/${success?.tasksPlanned ?? 0}`,
+          icon: CheckSquare,
+          tint: "text-sky-600",
+        },
+        {
+          label: "Focused time",
+          value: formatMinutes(success?.minutesAchieved ?? 0),
+          sub: `of ${formatMinutes(success?.minutesPlanned ?? 0)} planned`,
+          icon: Clock,
+          tint: "text-amber-600",
+        },
+        {
+          label: "Net balance",
+          value: formatMoney(data.financialSnapshot.netBalance, currency),
+          icon: Wallet,
+          tint:
+            data.financialSnapshot.netBalance >= 0
+              ? "text-emerald-600"
+              : "text-rose-600",
+        },
+      ]
+    : null;
 
   return (
     <div className="space-y-6">
@@ -143,36 +123,50 @@ export function DashboardOverview() {
         </p>
       </div>
 
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardContent className="flex items-start gap-2.5 py-4">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
-          <p className="text-sm leading-relaxed">{data.aiInsight}</p>
-        </CardContent>
-      </Card>
+      {overviewLoading && !data ? (
+        <Card className="border-primary/20">
+          <CardContent className="py-4">
+            <Skeleton className="h-4 w-full max-w-xl" />
+          </CardContent>
+        </Card>
+      ) : data ? (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="flex items-start gap-2.5 py-4">
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+            <p className="text-sm leading-relaxed">{data.aiInsight}</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((k) => {
-          const Icon = k.icon;
-          return (
-            <Card key={k.label} className="border shadow-sm">
-              <CardContent className="space-y-2 py-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {k.label}
-                  </p>
-                  <Icon className={cn("size-4", k.tint)} />
-                </div>
-                <p className="text-xl font-semibold tabular-nums">{k.value}</p>
-                {k.sub && (
-                  <p className="text-xs text-muted-foreground">{k.sub}</p>
-                )}
-                {k.progress !== undefined && (
-                  <Progress value={k.progress} className="h-1.5" />
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        {kpis
+          ? kpis.map((k) => {
+              const Icon = k.icon;
+              return (
+                <Card key={k.label} className="border shadow-sm">
+                  <CardContent className="space-y-2 py-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {k.label}
+                      </p>
+                      <Icon className={cn("size-4", k.tint)} />
+                    </div>
+                    <p className="text-xl font-semibold tabular-nums">{k.value}</p>
+                    {k.sub && (
+                      <p className="text-xs text-muted-foreground">{k.sub}</p>
+                    )}
+                    {k.progress !== undefined && (
+                      <Progress value={k.progress} className="h-1.5" />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          : [1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse border shadow-sm">
+                <CardContent className="h-24" />
+              </Card>
+            ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
@@ -192,7 +186,9 @@ export function DashboardOverview() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.todayFocus.tasks.length === 0 ? (
+            {!data ? (
+              <Skeleton className="h-32 w-full" />
+            ) : data.todayFocus.tasks.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 No tasks due today. Plan one in Productivity.
               </p>
@@ -214,9 +210,9 @@ export function DashboardOverview() {
                 ))}
               </ul>
             )}
-            {data.taskStatus.overdue > 0 && (
+            {(data?.taskStatus.overdue ?? 0) > 0 && (
               <p className="text-xs text-rose-600">
-                {data.taskStatus.overdue} overdue —{" "}
+                {data?.taskStatus.overdue} overdue —{" "}
                 <Link href="/productivity" className="underline">
                   catch up
                 </Link>
@@ -241,82 +237,100 @@ export function DashboardOverview() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Income received</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {formatMoney(data.financialSnapshot.monthlyIncome, currency)}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">
-                Budgeted monthly expenses
-              </p>
-              <div className="space-y-1.5">
-                {(budgets ?? []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">
-                    No budgets yet — create them in Finance
+            {!data ? (
+              <Skeleton className="h-40 w-full" />
+            ) : (
+              <>
+                <div>
+                  <p className="text-xs text-muted-foreground">Income received</p>
+                  <p className="text-xl font-semibold tabular-nums">
+                    {formatMoney(data.financialSnapshot.monthlyIncome, currency)}
                   </p>
-                ) : (
-                  (budgets ?? []).slice(0, 3).map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span className="truncate pr-2">{b.name}</span>
-                      <span className="tabular-nums text-muted-foreground shrink-0">
-                        {formatMoney(b.amount, currency)}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+                </div>
 
-            <div className="border-t pt-3">
-              <p className="text-xs text-muted-foreground">
-                Available for savings / buffer
-              </p>
-              <p className="text-xl font-semibold tabular-nums text-emerald-600">
-                {formatMoney(
-                  Math.max(
-                    0,
-                    data.financialSnapshot.monthlyIncome -
-                      (budgets?.reduce((s, b) => s + b.amount, 0) ?? 0),
-                  ),
-                  currency,
-                )}
-              </p>
-            </div>
+                <div>
+                  <p className="mb-1.5 text-xs text-muted-foreground">
+                    Budgeted monthly expenses
+                  </p>
+                  <div className="space-y-1.5">
+                    {budgetsLoading && !budgets ? (
+                      <Skeleton className="h-12 w-full" />
+                    ) : (budgets ?? []).length === 0 ? (
+                      <p className="text-xs italic text-muted-foreground">
+                        No budgets yet — create them in Finance
+                      </p>
+                    ) : (
+                      (budgets ?? []).slice(0, 3).map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span className="truncate pr-2">{b.name}</span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {formatMoney(b.amount, currency)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Available for savings / buffer
+                  </p>
+                  <p className="text-xl font-semibold tabular-nums text-emerald-600">
+                    {formatMoney(
+                      Math.max(
+                        0,
+                        data.financialSnapshot.monthlyIncome -
+                          (budgets?.reduce((s, b) => s + b.amount, 0) ?? 0),
+                      ),
+                      currency,
+                    )}
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <MomentumCard
-          icon={Flame}
-          tint="text-orange-600"
-          label="Habits today"
-          value={`${success?.habitsDone ?? 0}/${success?.habitsTotal ?? 0}`}
-          progress={
-            success?.habitsTotal
-              ? Math.round((success.habitsDone / success.habitsTotal) * 100)
-              : 0
-          }
-        />
-        <MomentumCard
-          icon={Target}
-          tint="text-sky-600"
-          label="Productivity"
-          value={`${data.scores.productivityScore}/100`}
-          progress={data.scores.productivityScore}
-        />
-        <MomentumCard
-          icon={Clock}
-          tint="text-emerald-600"
-          label="Studied today"
-          value={formatMinutes(data.todayFocus.studyMinutes)}
-        />
+        {data ? (
+          <>
+            <MomentumCard
+              icon={Flame}
+              tint="text-orange-600"
+              label="Habits today"
+              value={`${success?.habitsDone ?? 0}/${success?.habitsTotal ?? 0}`}
+              progress={
+                success?.habitsTotal
+                  ? Math.round((success.habitsDone / success.habitsTotal) * 100)
+                  : 0
+              }
+            />
+            <MomentumCard
+              icon={Target}
+              tint="text-sky-600"
+              label="Productivity"
+              value={`${data.scores.productivityScore}/100`}
+              progress={data.scores.productivityScore}
+            />
+            <MomentumCard
+              icon={Clock}
+              tint="text-emerald-600"
+              label="Studied today"
+              value={formatMinutes(data.todayFocus.studyMinutes)}
+            />
+          </>
+        ) : (
+          [1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse border shadow-sm">
+              <CardContent className="h-20" />
+            </Card>
+          ))
+        )}
       </div>
 
       <div>

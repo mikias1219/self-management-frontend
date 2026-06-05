@@ -1,10 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowRight, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuleShell } from "@/components/shared/module-shell";
-import { MetricChart } from "@/components/shared/metric-chart";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/shared/stat-card";
 import {
   analyticsToChartData,
@@ -21,6 +22,16 @@ import { usePeriod } from "@/hooks/use-period";
 import { useStandData } from "@/hooks/use-stand-data";
 import type { ModuleCounts } from "@/lib/types";
 import { formatMoney } from "@/lib/utils/period";
+
+const MetricChart = dynamic(
+  () =>
+    import("@/components/shared/metric-chart").then((m) => ({
+      default: m.MetricChart,
+    })),
+  {
+    loading: () => <Skeleton className="h-[220px] w-full rounded-xl" />,
+  },
+);
 
 const PRODUCTIVITY_KEYS = ["tasks", "goals", "habitLogs", "dailyReviews"] as const;
 const GROWTH_KEYS = ["studySessions", "courses", "books", "englishPractices"] as const;
@@ -63,7 +74,7 @@ export function AnalyticsModule() {
   const { data, isLoading } = useStandData(
     ["analytics", "counts", query],
     () => analyticsApi.getCounts(query),
-    { enabled: authenticated },
+    { enabled: authenticated, staleTime: 60_000 },
   );
 
   const c = data?.counts;
