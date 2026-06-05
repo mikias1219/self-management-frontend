@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { format } from "date-fns";
 import Link from "next/link";
 import {
@@ -18,26 +19,27 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { MetricChart } from "@/components/shared/metric-chart";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatGrid } from "@/components/shared/stat-grid";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ModuleRelations } from "@/components/shared/module-relations";
-import {
-  FinanceDialog,
-  type FinanceDialogMode,
-  type TxPreset,
-  type TxPresetValues,
+import { ModuleRelations, type RelationLink } from "@/components/shared/module-relations";
+import type {
+  FinanceDialogMode,
+  TxPreset,
+  TxPresetValues,
 } from "@/components/finance/finance-dialog";
-import { useFinanceRelations } from "@/hooks/use-module-relations";
+import { colorForModuleKey } from "@/lib/constants/chart-colors";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { analyticsApi, financeApi, settingsApi } from "@/lib/api";
+import { analyticsApi } from "@/lib/api/analytics";
+import { financeApi } from "@/lib/api/finance";
+import { settingsApi } from "@/lib/api/settings";
 import { hasAuthToken } from "@/lib/api/client";
 import type {
   Budget,
@@ -52,6 +54,24 @@ import { CHART_PALETTE } from "@/lib/constants/chart-colors";
 import { getApiErrorMessage } from "@/lib/utils/api-error";
 import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { useStandUi } from "@/stores/use-stand";
+
+const MetricChart = dynamic(
+  () =>
+    import("@/components/shared/metric-chart").then((m) => ({
+      default: m.MetricChart,
+    })),
+  {
+    loading: () => <Skeleton className="h-[220px] w-full rounded-xl" />,
+  },
+);
+
+const FinanceDialog = dynamic(
+  () =>
+    import("@/components/finance/finance-dialog").then((m) => ({
+      default: m.FinanceDialog,
+    })),
+  { ssr: false },
+);
 
 type DialogMode = FinanceDialogMode;
 
@@ -74,6 +94,16 @@ export function FinanceModule() {
     null,
   );
 
+  const dialogOpen = dialogMode !== null;
+  const onOverview = pageTab === "overview";
+  const onTransactions = pageTab === "transactions";
+  const onAccounts = pageTab === "accounts";
+  const onBudgets = pageTab === "budgets";
+  const onSavings = pageTab === "savings";
+  const onObligations = pageTab === "obligations";
+  const onCycle = pageTab === "cycle";
+  const onCategories = pageTab === "categories";
+
   const summary = useStandData(
     ["finance", "summary", query],
     () => financeApi.getSummary(query),
@@ -82,44 +112,81 @@ export function FinanceModule() {
   const financeIntel = useStandData(
     ["analytics", "finance-intelligence", query],
     () => analyticsApi.getFinanceIntelligence(query),
-    { enabled: authenticated },
+    { enabled: authenticated && onOverview },
   );
-  const accounts = useStandData(["finance", "accounts"], () =>
-    financeApi.accounts.getAll(),
+  const accounts = useStandData(
+    ["finance", "accounts"],
+    () => financeApi.accounts.getAll(),
+    { enabled: authenticated && (onAccounts || dialogOpen || onOverview) },
   );
   const transactions = useStandData(
     ["finance", "transactions", query],
     () => financeApi.transactions.getAll(query),
-    { enabled: authenticated },
+    { enabled: authenticated && (onTransactions || dialogOpen) },
   );
-  const budgets = useStandData(["finance", "budgets"], () =>
-    financeApi.budgets.getAll(),
+  const budgets = useStandData(
+    ["finance", "budgets"],
+    () => financeApi.budgets.getAll(),
+    { enabled: authenticated && onBudgets },
   );
-  const savings = useStandData(["finance", "savings"], () =>
-    financeApi.savingsGoals.getAll(),
+  const savings = useStandData(
+    ["finance", "savings"],
+    () => financeApi.savingsGoals.getAll(),
+    { enabled: authenticated && onSavings },
   );
-  const expenseCats = useStandData(["finance", "expense-cats"], () =>
-    financeApi.expenseCategories.getAll(),
+  const expenseCats = useStandData(
+    ["finance", "expense-cats"],
+    () => financeApi.expenseCategories.getAll(),
+    { enabled: authenticated && (onCategories || dialogOpen) },
   );
-  const incomeCats = useStandData(["finance", "income-cats"], () =>
-    financeApi.incomeCategories.getAll(),
+  const incomeCats = useStandData(
+    ["finance", "income-cats"],
+    () => financeApi.incomeCategories.getAll(),
+    { enabled: authenticated && (onCategories || dialogOpen) },
   );
-  const recurring = useStandData(["finance", "recurring"], () =>
-    financeApi.recurringObligations.getAll(),
+  const recurring = useStandData(
+    ["finance", "recurring"],
+    () => financeApi.recurringObligations.getAll(),
+    { enabled: authenticated && onObligations },
   );
-  const allCycles = useStandData(["finance", "cycles"], () =>
-    financeApi.cycles.getAll(),
-    { enabled: authenticated },
+  const allCycles = useStandData(
+    ["finance", "cycles"],
+    () => financeApi.cycles.getAll(),
+    { enabled: authenticated && onCycle },
   );
   const userSettings = useStandData(["settings"], () => settingsApi.get(), {
-    enabled: authenticated,
+    enabled: authenticated && onOverview,
   });
 
   const accountList = accounts.data ?? [];
   const expenseCatList = expenseCats.data ?? [];
   const incomeCatList = incomeCats.data ?? [];
-  const { links: financeLinks } = useFinanceRelations();
   const s = summary.data;
+
+  const financeLinks = useMemo((): RelationLink[] => {
+    const t = s?.totals;
+    if (!t) return [];
+    return [
+      {
+        label: "Transactions",
+        href: "/finance",
+        value: t.transactionCount,
+        color: colorForModuleKey("transactions"),
+      },
+      {
+        label: "Savings rate",
+        href: "/finance",
+        value: `${t.savingsRate}%`,
+        color: "#22c55e",
+      },
+      {
+        label: "Budgets tracked",
+        href: "/finance",
+        value: s?.budgets.length ?? 0,
+        color: "#f59e0b",
+      },
+    ];
+  }, [s?.totals, s?.budgets.length]);
 
   const savingsDisplay = useMemo(() => {
     const goals = savings.data ?? [];
@@ -540,7 +607,8 @@ export function FinanceModule() {
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-6">
+        {pageTab === "overview" && (
+        <div className="mt-4 space-y-6">
           {(!s?.currentCycle || Number(s.currentCycle.netSalary) === 0) && (
             <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 space-y-3">
               <p className="font-medium flex items-center gap-2">
@@ -709,9 +777,11 @@ export function FinanceModule() {
               />
             </div>
           )}
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="transactions" className="mt-4">
+        {pageTab === "transactions" && (
+        <div className="mt-4">
           <DataTable
             columns={txColumns}
             data={transactions.data ?? []}
@@ -728,9 +798,11 @@ export function FinanceModule() {
               confirmDelete("transaction", () => deleteTx.mutate(row.id))
             }
           />
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="accounts" className="mt-4 space-y-4">
+        {pageTab === "accounts" && (
+        <div className="mt-4 space-y-4">
           <Button size="sm" variant="outline" onClick={() => openAdd("account")}>
             <Plus className="size-4" /> Add account
           </Button>
@@ -747,9 +819,11 @@ export function FinanceModule() {
               confirmDelete("account", () => deleteAccount.mutate(row.id))
             }
           />
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="budgets" className="mt-4 space-y-4">
+        {pageTab === "budgets" && (
+        <div className="mt-4 space-y-4">
           <Button size="sm" variant="outline" onClick={() => openAdd("budget")}>
             <Plus className="size-4" /> Add budget
           </Button>
@@ -801,9 +875,11 @@ export function FinanceModule() {
               );
             })}
           </div>
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="obligations" className="mt-4 space-y-6">
+        {pageTab === "obligations" && (
+        <div className="mt-4 space-y-6">
           {!s?.currentCycle ? (
             <p className="text-sm text-muted-foreground">
               Open a cycle by logging salary, then pending bills appear here each cycle.
@@ -877,9 +953,11 @@ export function FinanceModule() {
               </li>
             ))}
           </ul>
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="cycle" className="mt-4 space-y-4">
+        {pageTab === "cycle" && (
+        <div className="mt-4 space-y-4">
           {currentCycle ? (
             <>
               {(() => {
@@ -1056,9 +1134,11 @@ export function FinanceModule() {
               ))}
             </ul>
           </div>
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="savings" className="mt-4 space-y-4">
+        {pageTab === "savings" && (
+        <div className="mt-4 space-y-4">
           <Button size="sm" variant="outline" onClick={() => openAdd("savings")}>
             <Plus className="size-4" /> Add savings goal
           </Button>
@@ -1129,9 +1209,11 @@ export function FinanceModule() {
               );
             })}
           </div>
-        </TabsContent>
+        </div>
+        )}
 
-        <TabsContent value="categories" className="mt-4 space-y-6">
+        {pageTab === "categories" && (
+        <div className="mt-4 space-y-6">
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-medium">Expense categories</h3>
@@ -1187,12 +1269,14 @@ export function FinanceModule() {
               ))}
             </div>
           </div>
-        </TabsContent>
+        </div>
+        )}
       </Tabs>
 
+      {dialogMode && (
       <FinanceDialog
         mode={dialogMode}
-        open={!!dialogMode}
+        open
         txPreset={txPreset}
         presetValues={txPresetValues}
         cyclePeriod={
@@ -1269,6 +1353,7 @@ export function FinanceModule() {
         onSubmitIncomeCat={(data) => createIncomeCat.mutate(data)}
         onSubmitRecurring={(data) => createRecurring.mutate(data)}
       />
+      )}
     </ModuleShell>
   );
 }

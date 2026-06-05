@@ -165,10 +165,10 @@ export const useDataCache = create<DataCacheState>((set, get) => ({
     set({ pendingMutations: get().pendingMutations + 1 });
     try {
       const result = await fn();
-      if (options?.invalidateAll) {
-        get().refetchAllRegistered();
-      } else if (options?.invalidate?.length) {
+      if (options?.invalidate?.length) {
         get().refetchMany(options.invalidate);
+      } else if (options?.invalidateAll) {
+        get().refetchAllRegistered();
       }
       return result;
     } finally {

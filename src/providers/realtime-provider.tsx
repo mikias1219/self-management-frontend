@@ -19,7 +19,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     getRealtimeSocket();
-    const unsub = subscribeRealtime(() => invalidateFromRealtime());
+    const unsub = subscribeRealtime((payload) => invalidateFromRealtime(payload));
     return () => {
       unsub();
     };

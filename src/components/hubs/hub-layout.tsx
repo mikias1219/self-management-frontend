@@ -3,7 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export interface HubTab {
@@ -130,15 +130,9 @@ export function HubLayout({
         {activeMeta?.description ? (
           <p className="text-xs text-muted-foreground">{activeMeta.description}</p>
         ) : null}
-        {tabs.map((t) => (
-          <TabsContent
-            key={t.id}
-            value={t.id}
-            className={cn("mt-4", compact && "mt-3")}
-          >
-            {children(t.id)}
-          </TabsContent>
-        ))}
+        <div className={cn("mt-4", compact && "mt-3")}>
+          {children(activeTab)}
+        </div>
       </Tabs>
     </div>
   );

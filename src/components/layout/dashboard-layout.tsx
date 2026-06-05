@@ -1,8 +1,16 @@
 "use client";
 
-import { FloatingAiChat } from "@/components/ai-coach/floating-ai-chat";
+import dynamic from "next/dynamic";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
+
+const FloatingAiChat = dynamic(
+  () =>
+    import("@/components/ai-coach/floating-ai-chat").then((m) => ({
+      default: m.FloatingAiChat,
+    })),
+  { ssr: false },
+);
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

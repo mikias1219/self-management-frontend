@@ -37,7 +37,7 @@ export function useStandData<T>(
     if (!entry?.loading && (entry?.data === undefined || entry?.error)) {
       void useDataCache.getState().fetch(keyParts, run);
     }
-  }, [key, enabled, keyParts]);
+  }, [key, enabled]);
 
   const refetch = useCallback(() => {
     if (!enabled) return Promise.resolve();
@@ -57,7 +57,7 @@ export function useStandMutation<TArg, TResult>(
   mutationFn: (arg: TArg) => Promise<TResult>,
   options?: {
     invalidateKeys?: unknown[][];
-    /** Refetch all registered API data (default true for creates). */
+    /** Refetch all registered API data (default false; prefer invalidateKeys). */
     invalidateAll?: boolean;
     onSuccess?: (result: TResult) => void;
     onError?: (error: unknown) => void;
@@ -74,7 +74,7 @@ export function useStandMutation<TArg, TResult>(
           () => mutationRef.current(arg),
           {
             invalidate: options?.invalidateKeys,
-            invalidateAll: options?.invalidateAll ?? true,
+            invalidateAll: options?.invalidateAll ?? false,
           },
         );
         options?.onSuccess?.(result as TResult);

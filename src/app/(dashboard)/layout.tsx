@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { useAccentFromSettings } from "@/hooks/use-accent-from-settings";
@@ -14,20 +14,21 @@ export default function ProtectedDashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const ready = useStandUi((s) => s.authReady);
   const setAuthReady = useStandUi((s) => s.setAuthReady);
   useAccentFromSettings();
+
+  useLayoutEffect(() => {
+    setAuthReady(hasAuthToken());
+  }, [setAuthReady]);
 
   useEffect(() => {
     if (!hasAuthToken()) {
       setAuthReady(false);
       router.replace(`/login?from=${encodeURIComponent(pathname)}`);
-      return;
     }
-    setAuthReady(true);
   }, [router, pathname, setAuthReady]);
 
-  if (!ready) {
+  if (!hasAuthToken()) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Loading LifeOS...
