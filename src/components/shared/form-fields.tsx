@@ -76,12 +76,14 @@ export function FormSelect({
   options,
   defaultValue,
   required,
+  onChange,
 }: {
   label: string;
   name: string;
   options: { value: string; label: string }[];
   defaultValue?: string;
   required?: boolean;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 }) {
   return (
     <div className="space-y-1.5">
@@ -91,6 +93,7 @@ export function FormSelect({
         name={name}
         required={required}
         defaultValue={defaultValue}
+        onChange={onChange}
         className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
       >
         {options.map((o) => (

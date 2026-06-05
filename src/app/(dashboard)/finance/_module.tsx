@@ -1,10 +1,15 @@
 "use client";
 
 import { format } from "date-fns";
+import Link from "next/link";
 import {
+  AlertCircle,
+  ArrowRightLeft,
+  Calendar,
   DollarSign,
   PiggyBank,
   Plus,
+  Receipt,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -17,22 +22,21 @@ import { MetricChart } from "@/components/shared/metric-chart";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatGrid } from "@/components/shared/stat-grid";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { FormField } from "@/components/shared/form-fields";
 import { ModuleRelations } from "@/components/shared/module-relations";
-import { FormField, FormSelect } from "@/components/shared/form-fields";
+import {
+  FinanceDialog,
+  type FinanceDialogMode,
+  type TxPreset,
+  type TxPresetValues,
+} from "@/components/finance/finance-dialog";
 import { useFinanceRelations } from "@/hooks/use-module-relations";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { analyticsApi, financeApi } from "@/lib/api";
+import { analyticsApi, financeApi, settingsApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import type {
   Budget,
@@ -42,28 +46,20 @@ import type {
   IncomeCategory,
   SavingsGoal,
 } from "@/lib/types";
-import type { AccountType, TransactionType } from "@/lib/types/finance";
+import type { FinanceSummaryObligation } from "@/lib/types/finance";
 import { CHART_PALETTE } from "@/lib/constants/chart-colors";
+import { getApiErrorMessage } from "@/lib/utils/api-error";
 import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { useStandUi } from "@/stores/use-stand";
 
-const ACCOUNT_TYPES: AccountType[] = [
-  "checking",
-  "savings",
-  "credit",
-  "cash",
-  "investment",
-];
-const TX_TYPES: TransactionType[] = ["income", "expense", "transfer"];
+type DialogMode = FinanceDialogMode;
 
-type DialogMode =
-  | "transaction"
-  | "account"
-  | "budget"
-  | "savings"
-  | "expense-cat"
-  | "income-cat"
-  | null;
+function classificationLabel(
+  t?: ExpenseCategory["classificationType"],
+): string | null {
+  if (!t) return null;
+  return t.replace(/_/g, " ");
+}
 
 export function FinanceModule() {
   const { query, label } = usePeriod();
@@ -71,6 +67,8 @@ export function FinanceModule() {
   const pageTab = useStandUi((s) => s.pageTab["finance"] ?? "overview");
   const setPageTab = useStandUi((s) => s.setPageTab);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
+  const [txPreset, setTxPreset] = useState<TxPreset>("default");
+  const [txPresetValues, setTxPresetValues] = useState<TxPresetValues | undefined>();
   const [editing, setEditing] = useState<{ type: DialogMode; id: string } | null>(
     null,
   );
@@ -105,12 +103,39 @@ export function FinanceModule() {
   const incomeCats = useStandData(["finance", "income-cats"], () =>
     financeApi.incomeCategories.getAll(),
   );
+  const recurring = useStandData(["finance", "recurring"], () =>
+    financeApi.recurringObligations.getAll(),
+  );
+  const userSettings = useStandData(["settings"], () => settingsApi.get(), {
+    enabled: authenticated,
+  });
 
   const accountList = accounts.data ?? [];
   const expenseCatList = expenseCats.data ?? [];
   const incomeCatList = incomeCats.data ?? [];
   const { links: financeLinks } = useFinanceRelations();
   const s = summary.data;
+
+  const savingsDisplay = useMemo(() => {
+    const goals = savings.data ?? [];
+    const fromSummary = s?.savingsGoals ?? [];
+    return goals.map((g) => {
+      const enriched = fromSummary.find((sg) => sg.id === g.id);
+      if (!enriched) return g;
+      return {
+        ...g,
+        monthlyTargetAmount:
+          enriched.monthlyTargetAmount ?? g.monthlyTargetAmount,
+        projectedCompletionDate:
+          enriched.projectedCompletionDate ?? g.projectedCompletionDate,
+        savingsShortfallCarryForward:
+          enriched.savingsShortfallCarryForward ?? g.savingsShortfallCarryForward,
+      };
+    });
+  }, [savings.data, s?.savingsGoals]);
+
+  const currentCycle = s?.currentCycle ?? null;
+
   const intel = financeIntel.data;
   const currency = intel?.currency ?? accountList[0]?.currency ?? "ETB";
 
@@ -131,7 +156,8 @@ export function FinanceModule() {
         setDialogMode(null);
         toast.success("Transaction saved");
       },
-      onError: () => toast.error("Failed to save transaction"),
+      onError: (err) =>
+        toast.error(getApiErrorMessage(err, "Failed to save transaction")),
     },
   );
   const updateTx = useStandMutation(
@@ -264,6 +290,27 @@ export function FinanceModule() {
       },
     },
   );
+  const createRecurring = useStandMutation(
+    (p: Parameters<typeof financeApi.recurringObligations.create>[0]) =>
+      financeApi.recurringObligations.create(p),
+    {
+      invalidateKeys: [["finance", "recurring"], ...invalidateFinance],
+      onSuccess: () => {
+        setDialogMode(null);
+        toast.success("Recurring obligation created");
+      },
+    },
+  );
+  const updateAllocation = useStandMutation(
+    (p: Parameters<typeof financeApi.cycles.updateAllocation>[0]) =>
+      financeApi.cycles.updateAllocation(p),
+    {
+      invalidateKeys: invalidateFinance,
+      onSuccess: () => toast.success("Cycle allocation updated"),
+      onError: (err) =>
+        toast.error(getApiErrorMessage(err, "Allocation failed")),
+    },
+  );
 
   const catName = (id: string | undefined, type: "expense" | "income") => {
     if (!id) return "—";
@@ -278,7 +325,20 @@ export function FinanceModule() {
         header: "Date",
         cell: (r) => format(new Date(r.transactionDate), "MMM d, yyyy"),
       },
-      { key: "type", header: "Type", cell: (r) => r.transactionType },
+      {
+        key: "type",
+        header: "Type",
+        cell: (r) => (
+          <span className="flex items-center gap-1.5">
+            {r.transactionType}
+            {r.needsReview && (
+              <Badge variant="destructive" className="text-[10px] px-1 py-0">
+                Review
+              </Badge>
+            )}
+          </span>
+        ),
+      },
       {
         key: "amount",
         header: "Amount",
@@ -327,7 +387,29 @@ export function FinanceModule() {
 
   const openAdd = (mode: DialogMode) => {
     setEditing(null);
+    setTxPreset("default");
+    setTxPresetValues(undefined);
     setDialogMode(mode);
+  };
+
+  const openTransaction = (preset: TxPreset = "default", values?: TxPresetValues) => {
+    if (accountList.length === 0) {
+      toast.error("Add a checking account first (Accounts tab)");
+      return;
+    }
+    setEditing(null);
+    setTxPreset(preset);
+    setTxPresetValues(values);
+    setDialogMode("transaction");
+  };
+
+  const payObligation = (o: FinanceSummaryObligation) => {
+    openTransaction("pay_obligation", {
+      transactionType: "expense",
+      amount: o.expectedAmount,
+      pendingObligationId: o.id,
+      description: `Payment: ${o.name}`,
+    });
   };
 
   const confirmDelete = (label: string, fn: () => void) => {
@@ -356,10 +438,24 @@ export function FinanceModule() {
       icon={DollarSign}
       iconClassName="bg-amber-500/15 text-amber-700"
       actions={
-        <Button size="sm" onClick={() => openAdd("transaction")}>
-          <Plus className="size-4" />
-          Add transaction
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => openTransaction("salary")}>
+            <DollarSign className="size-4" />
+            Log salary
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openTransaction("expense")}>
+            <Receipt className="size-4" />
+            Expense
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openTransaction("savings_transfer")}
+          >
+            <ArrowRightLeft className="size-4" />
+            Save
+          </Button>
+        </div>
       }
     >
       <StatGrid>
@@ -405,20 +501,77 @@ export function FinanceModule() {
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="budgets">Budgets</TabsTrigger>
           <TabsTrigger value="savings">Savings</TabsTrigger>
+          <TabsTrigger value="obligations">
+            Obligations
+            {(s?.obligations.overdue.length ?? 0) > 0 && (
+              <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
+                {s!.obligations.overdue.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="cycle">Cycle</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
-          {/* Clear business rule explanation */}
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-            <p className="font-medium text-primary">How tracking works</p>
-            <ol className="mt-2 list-decimal pl-5 text-muted-foreground space-y-0.5">
-              <li>Log your salary as <strong>Income</strong> → it increases your balance and counts as "received".</li>
-              <li>Create <strong>Budgets</strong> for fixed monthly costs (Rent 7,500, Groceries, etc.).</li>
-              <li>Every expense you log against a budget category updates the progress bar automatically.</li>
-              <li>What remains after your budgeted amounts = money available for savings or buffer.</li>
-            </ol>
-          </div>
+          {!s?.currentCycle && (
+            <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 space-y-3">
+              <p className="font-medium flex items-center gap-2">
+                <Calendar className="size-4" />
+                Get started with salary-based cycles
+              </p>
+              <ol className="list-decimal pl-5 text-sm text-muted-foreground space-y-1">
+                <li>
+                  Set your{" "}
+                  <Link href="/settings" className="text-primary underline">
+                    salary day
+                  </Link>{" "}
+                  (currently day {userSettings.data?.salaryDay ?? 25})
+                </li>
+                <li>Add a checking account and a savings account</li>
+                <li>Log your salary — this opens your first cycle</li>
+                <li>Allocate fixed costs, savings, and spending on the Cycle tab</li>
+              </ol>
+              <Button size="sm" onClick={() => openTransaction("salary")}>
+                Log salary now
+              </Button>
+            </div>
+          )}
+
+          {s?.currentCycle && (
+            <div className="rounded-xl border bg-card p-4 text-sm space-y-2">
+              <p className="font-medium">
+                Salary cycle: {s.currentCycle.startDate} → {s.currentCycle.endDate}
+              </p>
+              <p className="text-muted-foreground">
+                Net salary {formatMoney(s.currentCycle.netSalary, currency)} ·
+                Variable spent {formatMoney(s.currentCycle.totalVariableSpent, currency)} ·
+                Health score {s.currentCycle.financialHealthScore}/100
+              </p>
+              {s.currentCycle.remainingUnallocated !== 0 && (
+                <p className="text-amber-600">
+                  Unallocated: {formatMoney(s.currentCycle.remainingUnallocated, currency)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {(s?.obligations.overdue.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-destructive flex items-center gap-1.5">
+                  <AlertCircle className="size-4" />
+                  {s!.obligations.overdue.length} overdue obligation(s)
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pay these from the Obligations tab or log an expense linked to each.
+                </p>
+              </div>
+              <Button size="sm" variant="destructive" onClick={() => setPageTab("finance", "obligations")}>
+                View
+              </Button>
+            </div>
+          )}
 
           {/* Main tracking card */}
           <div className="rounded-xl border bg-card p-5 space-y-6">
@@ -430,13 +583,8 @@ export function FinanceModule() {
                   {formatMoney(intel?.monthly.income ?? 0, currency)}
                 </p>
               </div>
-              <Button
-                onClick={() => {
-                  setDialogMode("transaction");
-                  // The dialog will default to expense; user can change to income
-                }}
-              >
-                <Plus className="size-4" /> Log salary / income
+              <Button onClick={() => openTransaction("salary")}>
+                <Plus className="size-4" /> Log salary
               </Button>
             </div>
 
@@ -479,19 +627,15 @@ export function FinanceModule() {
             <div className="border-t pt-5">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
                 <div>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Available for savings / buffer</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Unallocated in cycle plan</p>
                   <p className="text-2xl font-semibold tabular-nums text-emerald-600">
                     {formatMoney(
-                      Math.max(
-                        0,
-                        (intel?.monthly.income ?? 0) -
-                          (s?.budgets?.reduce((sum, b) => sum + b.amount, 0) ?? 0),
-                      ),
+                      Math.max(0, s?.currentCycle?.remainingUnallocated ?? 0),
                       currency,
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Income received minus total budgeted amounts
+                    After fixed, savings target, and sub-budgets
                   </p>
                 </div>
                 <Button variant="outline" onClick={() => setPageTab("finance", "savings")}>
@@ -503,14 +647,17 @@ export function FinanceModule() {
 
           {/* Quick actions */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "transactions")}>
-              Log an expense
+            <Button variant="secondary" size="sm" onClick={() => openTransaction("salary")}>
+              Log salary
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "budgets")}>
-              Create / edit budgets
+            <Button variant="secondary" size="sm" onClick={() => openTransaction("expense")}>
+              Log expense
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "savings")}>
-              Set a savings goal
+            <Button variant="secondary" size="sm" onClick={() => openTransaction("savings_transfer")}>
+              Transfer to savings
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "cycle")}>
+              Plan cycle
             </Button>
           </div>
 
@@ -546,6 +693,8 @@ export function FinanceModule() {
             emptyMessage="No transactions yet. Add your salary as income, then log expenses against your budgets."
             onEdit={(row) => {
               setEditing({ type: "transaction", id: row.id });
+              setTxPreset("default");
+              setTxPresetValues(undefined);
               setDialogMode("transaction");
             }}
             onDelete={(row) =>
@@ -627,20 +776,234 @@ export function FinanceModule() {
           </div>
         </TabsContent>
 
+        <TabsContent value="obligations" className="mt-4 space-y-6">
+          {!s?.currentCycle ? (
+            <p className="text-sm text-muted-foreground">
+              Open a cycle by logging salary, then pending bills appear here each cycle.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Cycle {s.currentCycle.startDate} → {s.currentCycle.endDate}. Pay bills with one
+                tap — amounts pre-fill from your recurring setup.
+              </p>
+              {(s.obligations.overdue.length > 0 ||
+                s.obligations.upcoming.length > 0) && (
+                <div className="space-y-2">
+                  {[...s.obligations.overdue, ...s.obligations.upcoming].map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-3"
+                    >
+                      <div>
+                        <p className="font-medium flex items-center gap-2">
+                          {o.name}
+                          {o.status === "overdue" && (
+                            <Badge variant="destructive">Overdue</Badge>
+                          )}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Due {o.dueDate} · {formatMoney(o.expectedAmount, currency)}
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={() => payObligation(o)}>
+                        Pay
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {s.obligations.overdue.length === 0 &&
+                s.obligations.upcoming.length === 0 && (
+                  <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-6 text-center">
+                    No pending obligations. Add recurring bills on the Cycle tab.
+                  </p>
+                )}
+              {s.obligations.paidThisCycle.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Paid this cycle</h3>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {s.obligations.paidThisCycle.map((o) => (
+                      <li key={o.id} className="flex justify-between rounded border px-3 py-2">
+                        <span>{o.name}</span>
+                        <span>{formatMoney(o.expectedAmount, currency)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+          <div className="flex items-center justify-between pt-2 border-t">
+            <h3 className="text-sm font-medium">Recurring templates</h3>
+            <Button size="sm" variant="outline" onClick={() => openAdd("recurring")}>
+              <Plus className="size-4" /> Add
+            </Button>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {(recurring.data ?? []).map((r) => (
+              <li key={r.id} className="rounded border px-3 py-2 flex justify-between">
+                <span>{r.name}</span>
+                <span className="text-muted-foreground">
+                  {formatMoney(Number(r.amount), currency)} · day {r.dueDayOfMonth}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </TabsContent>
+
+        <TabsContent value="cycle" className="mt-4 space-y-4">
+          {currentCycle ? (
+            <>
+              <div className="rounded-lg border bg-card p-4 space-y-3">
+                <p className="font-medium">Cycle allocation</p>
+                <p className="text-sm text-muted-foreground">
+                  Fixed + savings + spending must equal net salary (
+                  {formatMoney(currentCycle.netSalary, currency)})
+                </p>
+                <form
+                  className="grid gap-3 sm:grid-cols-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const net = Number(currentCycle.netSalary);
+                    const fixed = Number(fd.get("fixedObligations")) || 0;
+                    const savings = Number(fd.get("savingsTarget")) || 0;
+                    if (fixed + savings > net) {
+                      toast.error(
+                        `Fixed + savings (${formatMoney(fixed + savings, currency)}) cannot exceed net salary (${formatMoney(net, currency)})`,
+                      );
+                      return;
+                    }
+                    updateAllocation.mutate({
+                      fixedObligations: fixed,
+                      savingsTarget: savings,
+                      spendingBudget: net - fixed - savings,
+                    });
+                  }}
+                >
+                  <FormField
+                    label="Fixed obligations"
+                    name="fixedObligations"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={currentCycle.fixedObligations}
+                  />
+                  <FormField
+                    label="Savings target"
+                    name="savingsTarget"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={currentCycle.savingsTarget}
+                  />
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium leading-none">Spending budget</p>
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm tabular-nums">
+                      {formatMoney(
+                        Math.max(
+                          0,
+                          Number(currentCycle.netSalary) -
+                            Number(currentCycle.fixedObligations) -
+                            Number(currentCycle.savingsTarget),
+                        ),
+                        currency,
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-calculated: net salary minus fixed and savings
+                    </p>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Button type="submit" size="sm">
+                      Save allocation
+                    </Button>
+                  </div>
+                </form>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Fixed paid</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {formatMoney(currentCycle.totalFixedObligations, currency)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Savings transferred</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {formatMoney(currentCycle.totalSavingsAllocated, currency)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Variable spent</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {formatMoney(currentCycle.totalVariableSpent, currency)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Remaining balance</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {formatMoney(currentCycle.remainingBalance, currency)}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No open cycle. Log a salary income transaction to start a cycle.
+            </p>
+          )}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-medium">Recurring obligations (rent, etc.)</h3>
+              <Button size="sm" variant="outline" onClick={() => openAdd("recurring")}>
+                Add
+              </Button>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {(recurring.data ?? []).map((r) => (
+                <li key={r.id} className="rounded border px-3 py-2 flex justify-between">
+                  <span>{r.name}</span>
+                  <span className="text-muted-foreground">
+                    {formatMoney(Number(r.amount), currency)} · day {r.dueDayOfMonth}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </TabsContent>
+
         <TabsContent value="savings" className="mt-4 space-y-4">
           <Button size="sm" variant="outline" onClick={() => openAdd("savings")}>
             <Plus className="size-4" /> Add savings goal
           </Button>
           <div className="grid gap-3 md:grid-cols-2">
-            {(savings.data ?? []).map((g) => {
+            {savingsDisplay.map((g) => {
               const target = Number(g.targetAmount);
               const current = Number(g.currentAmount);
               const pct = target > 0 ? (current / target) * 100 : 0;
               return (
                 <div key={g.id} className="rounded-lg border bg-card p-4">
-                  <div className="flex items-start justify-between">
-                    <p className="font-medium">{g.name}</p>
-                    <div className="flex gap-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{g.name}</p>
+                      {g.monthlyTargetAmount != null && g.monthlyTargetAmount > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Monthly target {formatMoney(g.monthlyTargetAmount, currency)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          openTransaction("savings_transfer", { savingsGoalId: g.id })
+                        }
+                      >
+                        Save
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -667,6 +1030,17 @@ export function FinanceModule() {
                     {formatMoney(current, currency)} / {formatMoney(target, currency)}
                   </p>
                   <Progress className="mt-2" value={Math.min(100, pct)} />
+                  {g.projectedCompletionDate && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      On track by {g.projectedCompletionDate}
+                    </p>
+                  )}
+                  {(g.savingsShortfallCarryForward ?? 0) > 0 && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Shortfall carry-forward:{" "}
+                      {formatMoney(g.savingsShortfallCarryForward!, currency)}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -689,12 +1063,17 @@ export function FinanceModule() {
               {expenseCatList.map((c) => (
                 <span
                   key={c.id}
-                  className="rounded-full border px-3 py-1 text-sm"
+                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
                   style={
                     c.color ? { borderColor: c.color, color: c.color } : undefined
                   }
                 >
                   {c.name}
+                  {c.classificationType && (
+                    <Badge variant="secondary" className="text-[10px] font-normal">
+                      {classificationLabel(c.classificationType)}
+                    </Badge>
+                  )}
                 </span>
               ))}
             </div>
@@ -730,15 +1109,29 @@ export function FinanceModule() {
       <FinanceDialog
         mode={dialogMode}
         open={!!dialogMode}
+        txPreset={txPreset}
+        presetValues={txPresetValues}
+        cyclePeriod={
+          s?.currentCycle
+            ? { start: s.currentCycle.startDate, end: s.currentCycle.endDate }
+            : undefined
+        }
         onOpenChange={(o) => {
           if (!o) {
             setDialogMode(null);
             setEditing(null);
+            setTxPreset("default");
+            setTxPresetValues(undefined);
           }
         }}
         accounts={accountList}
         expenseCats={expenseCatList}
         incomeCats={incomeCatList}
+        savingsGoals={savings.data ?? []}
+        pendingObligations={[
+          ...(s?.obligations.upcoming ?? []),
+          ...(s?.obligations.overdue ?? []),
+        ]}
         editingId={editing?.id}
         editTx={
           editing?.type === "transaction"
@@ -790,397 +1183,8 @@ export function FinanceModule() {
         }}
         onSubmitExpenseCat={(data) => createExpenseCat.mutate(data)}
         onSubmitIncomeCat={(data) => createIncomeCat.mutate(data)}
+        onSubmitRecurring={(data) => createRecurring.mutate(data)}
       />
     </ModuleShell>
-  );
-}
-
-function FinanceDialog({
-  mode,
-  open,
-  onOpenChange,
-  accounts,
-  expenseCats,
-  incomeCats,
-  editingId,
-  editTx,
-  editSavings,
-  editAccount,
-  editBudget,
-  onSubmitTx,
-  onSubmitAccount,
-  onSubmitBudget,
-  onSubmitSavings,
-  onSubmitExpenseCat,
-  onSubmitIncomeCat,
-}: {
-  mode: DialogMode;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  accounts: FinanceAccount[];
-  expenseCats: ExpenseCategory[];
-  incomeCats: IncomeCategory[];
-  editingId?: string;
-  editTx?: FinanceTransaction;
-  editSavings?: SavingsGoal;
-  editAccount?: FinanceAccount;
-  editBudget?: Budget;
-  onSubmitTx: (d: Partial<FinanceTransaction>) => void;
-  onSubmitAccount: (d: Partial<FinanceAccount>) => void;
-  onSubmitBudget: (d: Partial<Budget>) => void;
-  onSubmitSavings: (d: Partial<SavingsGoal>) => void;
-  onSubmitExpenseCat: (d: Partial<ExpenseCategory>) => void;
-  onSubmitIncomeCat: (d: Partial<IncomeCategory>) => void;
-}) {
-  if (!mode) return null;
-
-  const titles: Record<NonNullable<DialogMode>, string> = {
-    transaction: editingId ? "Edit transaction" : "Add transaction",
-    account: editingId ? "Edit account" : "Add account",
-    budget: editingId ? "Edit budget" : "Add budget",
-    savings: editingId ? "Edit savings goal" : "Add savings goal",
-    "expense-cat": "Add expense category",
-    "income-cat": "Add income category",
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{titles[mode]}</DialogTitle>
-          <DialogDescription>
-            Balances update automatically from transactions.
-          </DialogDescription>
-        </DialogHeader>
-
-        {mode === "transaction" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const type = fd.get("transactionType") as TransactionType;
-              onSubmitTx({
-                accountId: String(fd.get("accountId")),
-                transactionType: type,
-                amount: Number(fd.get("amount")),
-                currency: String(fd.get("currency") ?? "ETB"),
-                transactionDate: String(fd.get("transactionDate")),
-                description: String(fd.get("description") ?? "").trim() || undefined,
-                categoryId: String(fd.get("categoryId") ?? "") || undefined,
-                incomeSource:
-                  type === "income"
-                    ? (String(fd.get("incomeSource") ?? "") as FinanceTransaction["incomeSource"]) ||
-                      undefined
-                    : undefined,
-                paymentMethod:
-                  type === "expense"
-                    ? (String(fd.get("paymentMethod") ?? "") as FinanceTransaction["paymentMethod"]) ||
-                      undefined
-                    : undefined,
-                isRecurring: fd.get("isRecurring") === "on",
-                recurringInterval: String(
-                  fd.get("recurringInterval") ?? "none",
-                ) as FinanceTransaction["recurringInterval"],
-                linkedTaskId: String(fd.get("linkedTaskId") ?? "") || undefined,
-              });
-            }}
-          >
-            <FormSelect
-              label="Account"
-              name="accountId"
-              required
-              defaultValue={editTx?.accountId ?? accounts[0]?.id}
-              options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <FormSelect
-                label="Type"
-                name="transactionType"
-                defaultValue={editTx?.transactionType ?? "expense"}
-                options={TX_TYPES.map((t) => ({ value: t, label: t }))}
-              />
-              <FormField
-                label="Amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                defaultValue={editTx?.amount}
-              />
-            </div>
-            <FormField
-              label="Currency"
-              name="currency"
-              defaultValue={editTx?.currency ?? "ETB"}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <FormSelect
-                label="Income source"
-                name="incomeSource"
-                defaultValue={editTx?.incomeSource ?? "salary"}
-                options={[
-                  { value: "salary", label: "Salary" },
-                  { value: "freelance", label: "Freelance" },
-                  { value: "business", label: "Business" },
-                  { value: "investment", label: "Investment" },
-                  { value: "gift", label: "Gift" },
-                  { value: "other", label: "Other" },
-                ]}
-              />
-              <FormSelect
-                label="Payment method"
-                name="paymentMethod"
-                defaultValue={editTx?.paymentMethod ?? "cash"}
-                options={[
-                  { value: "cash", label: "Cash" },
-                  { value: "card", label: "Card" },
-                  { value: "mobile", label: "Mobile" },
-                  { value: "bank_transfer", label: "Bank transfer" },
-                  { value: "other", label: "Other" },
-                ]}
-              />
-            </div>
-            <FormSelect
-              label="Recurring"
-              name="recurringInterval"
-              defaultValue={editTx?.recurringInterval ?? "none"}
-              options={[
-                { value: "none", label: "One-time" },
-                { value: "weekly", label: "Weekly" },
-                { value: "monthly", label: "Monthly" },
-                { value: "yearly", label: "Yearly" },
-              ]}
-            />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="isRecurring"
-                defaultChecked={editTx?.isRecurring}
-              />
-              Recurring transaction
-            </label>
-            <FormField
-              label="Date"
-              name="transactionDate"
-              type="date"
-              required
-              defaultValue={
-                editTx?.transactionDate ?? format(new Date(), "yyyy-MM-dd")
-              }
-            />
-            <FormSelect
-              label="Category"
-              name="categoryId"
-              defaultValue={editTx?.categoryId ?? ""}
-              options={[
-                { value: "", label: "None" },
-                ...expenseCats.map((c) => ({ value: c.id, label: c.name })),
-                ...incomeCats.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-            />
-            <FormField
-              label="Description"
-              name="description"
-              defaultValue={editTx?.description}
-            />
-            <DialogFooter>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        {mode === "account" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              onSubmitAccount({
-                name: String(fd.get("name")),
-                accountType: fd.get("accountType") as AccountType,
-                balance: Number(fd.get("balance") ?? 0),
-                currency: String(fd.get("currency") ?? "ETB"),
-              });
-            }}
-          >
-            <FormField
-              label="Name"
-              name="name"
-              required
-              defaultValue={editAccount?.name}
-            />
-            <FormSelect
-              label="Type"
-              name="accountType"
-              defaultValue={editAccount?.accountType ?? "checking"}
-              options={ACCOUNT_TYPES.map((t) => ({ value: t, label: t }))}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="Opening balance"
-                name="balance"
-                type="number"
-                step="0.01"
-                defaultValue={editAccount?.balance ?? "0"}
-              />
-              <FormField
-                label="Currency"
-                name="currency"
-                defaultValue={editAccount?.currency ?? "ETB"}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit">Save account</Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        {mode === "budget" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              onSubmitBudget({
-                name: String(fd.get("name")),
-                amount: Number(fd.get("amount")),
-                periodStart: String(fd.get("periodStart")),
-                periodEnd: String(fd.get("periodEnd")),
-                categoryId: String(fd.get("categoryId") ?? "") || undefined,
-              });
-            }}
-          >
-            <FormField
-              label="Budget name"
-              name="name"
-              required
-              defaultValue={editBudget?.name}
-            />
-            <FormField
-              label="Limit amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              required
-              defaultValue={editBudget?.amount}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="Period start"
-                name="periodStart"
-                type="date"
-                required
-                defaultValue={editBudget?.periodStart}
-              />
-              <FormField
-                label="Period end"
-                name="periodEnd"
-                type="date"
-                required
-                defaultValue={editBudget?.periodEnd}
-              />
-            </div>
-            <FormSelect
-              label="Expense category (optional)"
-              name="categoryId"
-              defaultValue={editBudget?.categoryId ?? ""}
-              options={[
-                { value: "", label: "All expenses" },
-                ...expenseCats.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-            />
-            <DialogFooter>
-              <Button type="submit">Save budget</Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        {mode === "savings" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              onSubmitSavings({
-                name: String(fd.get("name")),
-                targetAmount: Number(fd.get("targetAmount")),
-                currentAmount: Number(fd.get("currentAmount") ?? 0),
-                targetDate: String(fd.get("targetDate") ?? "") || undefined,
-              });
-            }}
-          >
-            <FormField label="Goal name" name="name" required defaultValue={editSavings?.name} />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="Target"
-                name="targetAmount"
-                type="number"
-                step="0.01"
-                required
-                defaultValue={editSavings?.targetAmount}
-              />
-              <FormField
-                label="Current saved"
-                name="currentAmount"
-                type="number"
-                step="0.01"
-                defaultValue={editSavings?.currentAmount ?? 0}
-              />
-            </div>
-            <FormField
-              label="Target date"
-              name="targetDate"
-              type="date"
-              defaultValue={editSavings?.targetDate}
-            />
-            <DialogFooter>
-              <Button type="submit">Save goal</Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        {mode === "expense-cat" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              onSubmitExpenseCat({
-                name: String(fd.get("name")),
-                color: String(fd.get("color") ?? "") || undefined,
-              });
-            }}
-          >
-            <FormField label="Category name" name="name" required />
-            <FormField label="Color (hex)" name="color" placeholder="#ef4444" />
-            <DialogFooter>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
-        )}
-
-        {mode === "income-cat" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              onSubmitIncomeCat({
-                name: String(fd.get("name")),
-                color: String(fd.get("color") ?? "") || undefined,
-              });
-            }}
-          >
-            <FormField label="Category name" name="name" required />
-            <FormField label="Color (hex)" name="color" placeholder="#22c55e" />
-            <DialogFooter>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -258,7 +258,7 @@ export function DashboardOverview() {
                     No budgets yet — create them in Finance
                   </p>
                 ) : (
-                  budgets.slice(0, 3).map((b) => (
+                  (budgets ?? []).slice(0, 3).map((b) => (
                     <div
                       key={b.id}
                       className="flex items-center justify-between text-xs"

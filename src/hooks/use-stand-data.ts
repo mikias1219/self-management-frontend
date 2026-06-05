@@ -60,7 +60,7 @@ export function useStandMutation<TArg, TResult>(
     /** Refetch all registered API data (default true for creates). */
     invalidateAll?: boolean;
     onSuccess?: (result: TResult) => void;
-    onError?: () => void;
+    onError?: (error: unknown) => void;
   },
 ) {
   const isPending = useDataCache((s) => s.pendingMutations > 0);
@@ -79,8 +79,8 @@ export function useStandMutation<TArg, TResult>(
         );
         options?.onSuccess?.(result as TResult);
         return result;
-      } catch {
-        options?.onError?.();
+      } catch (error) {
+        options?.onError?.(error);
         return undefined;
       }
     },

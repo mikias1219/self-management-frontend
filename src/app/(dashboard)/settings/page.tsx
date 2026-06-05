@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FinanceSettingsCard } from "@/components/settings/finance-settings-card";
 import { GoogleCalendarSettings } from "@/components/settings/google-calendar-settings";
 import { settingsApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
@@ -54,6 +55,7 @@ export default function SettingsPage() {
 
       {authenticated && (
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          <FinanceSettingsCard enabled={authenticated} />
           <Card className="border shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">Appearance</CardTitle>
