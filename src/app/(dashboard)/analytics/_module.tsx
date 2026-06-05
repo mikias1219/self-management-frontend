@@ -32,7 +32,7 @@ const LIFE_KEYS = [
 ] as const;
 
 const MANAGE_LINKS = [
-  { label: "Plans & tasks", href: "/productivity?tab=plans" },
+  { label: "Tasks", href: "/productivity?tab=tasks" },
   { label: "Goals", href: "/productivity?tab=goals" },
   { label: "Habits", href: "/productivity?tab=habits" },
   { label: "Learning", href: "/growth?tab=learning" },
@@ -118,7 +118,7 @@ export function AnalyticsModule() {
         <StatCard title="Total activities" value={total} loading={isLoading} />
         <StatCard
           title="Net worth"
-          value={formatMoney(financeSummary?.totals.netWorth ?? 0)}
+          value={formatMoney(financeSummary?.totals.netWorth ?? 0, "ETB")}
           loading={isLoading}
         />
         <StatCard

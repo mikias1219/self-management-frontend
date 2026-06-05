@@ -7,6 +7,7 @@ import {
   LineChart,
   ListChecks,
   Settings,
+  UserRound,
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     group: "Overview",
     color: "bg-violet-500/15 text-violet-600",
-    description: "Results and achievements across all areas",
+    description: "Personal OS — focus, finance, tasks, AI insight",
   },
   {
     title: "Productivity",
@@ -40,7 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     group: "Life areas",
     color: "bg-sky-500/15 text-sky-600",
-    description: "Plans, tasks, goals, habits, daily reviews",
+    description: "Today, progress, tasks, goals, habits, and daily review",
   },
   {
     title: "Growth",
@@ -67,6 +68,14 @@ export const NAV_ITEMS: NavItem[] = [
     description: "Analytics and activity log",
   },
   {
+    title: "Profile",
+    href: "/profile",
+    icon: UserRound,
+    group: "System",
+    color: "bg-indigo-500/15 text-indigo-600",
+    description: "Your identity, focus areas, and life stats",
+  },
+  {
     title: "Notifications",
     href: "/notifications",
     icon: Bell,
@@ -87,32 +96,46 @@ export const NAV_GROUPS = ["Overview", "Life areas", "System"] as const;
 /** Deep links for header search (hub + tab). */
 export const NAV_SEARCH_EXTRAS: NavItem[] = [
   {
-    title: "Plans & tasks",
-    href: "/productivity?tab=plans",
+    title: "Today",
+    href: "/productivity?tab=today",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-violet-500/15 text-violet-600",
+  },
+  {
+    title: "Progress",
+    href: "/productivity?tab=progress",
     icon: ListChecks,
     group: "Productivity",
     color: "bg-sky-500/15 text-sky-600",
+  },
+  {
+    title: "All tasks",
+    href: "/productivity?tab=tasks",
+    icon: ListChecks,
+    group: "Productivity",
+    color: "bg-cyan-500/15 text-cyan-600",
   },
   {
     title: "Goals",
     href: "/productivity?tab=goals",
     icon: ListChecks,
     group: "Productivity",
-    color: "bg-cyan-500/15 text-cyan-600",
+    color: "bg-blue-500/15 text-blue-600",
   },
   {
     title: "Habits",
     href: "/productivity?tab=habits",
     icon: ListChecks,
     group: "Productivity",
-    color: "bg-blue-500/15 text-blue-600",
+    color: "bg-indigo-500/15 text-indigo-600",
   },
   {
     title: "Daily review",
-    href: "/productivity?tab=reviews",
+    href: "/productivity?tab=review",
     icon: ListChecks,
     group: "Productivity",
-    color: "bg-indigo-500/15 text-indigo-600",
+    color: "bg-purple-500/15 text-purple-600",
   },
   {
     title: "Learning",

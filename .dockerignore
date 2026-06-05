@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.git
+.gitignore
+README.md
+.env*
+!.env.example
+*.md
+.vscode
+.idea
+*.log
+.DS_Store
+
+# Docker (prevent recursive copy)
+Dockerfile
+.dockerignore

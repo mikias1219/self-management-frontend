@@ -13,8 +13,23 @@ export interface AiCoachSession extends BaseEntity {
   isArchived: boolean;
 }
 
+export interface AiProposedAction {
+  id: string;
+  tool: string;
+  label: string;
+  args: Record<string, unknown>;
+}
+
 export interface AiChatResponse {
   sessionId: string;
   reply: string;
+  messages: AiCoachMessage[];
+  pendingActions?: AiProposedAction[];
+}
+
+export interface AiActionResult {
+  sessionId: string;
+  ok: boolean;
+  message: string;
   messages: AiCoachMessage[];
 }

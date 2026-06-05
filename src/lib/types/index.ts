@@ -16,3 +16,5 @@ export * from "./ai-coach";
 export * from "./activity-log";
 export * from "./dashboard";
 export * from "./achievements";
+export * from "./life-area";
+export * from "./intelligence";

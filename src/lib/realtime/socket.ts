@@ -19,9 +19,12 @@ export interface RealtimeUpdate {
 }
 
 let socket: Socket | null = null;
+let connectDisabled = false;
 
 export function getRealtimeSocket(): Socket | null {
   if (typeof window === "undefined") return null;
+  if (connectDisabled) return null;
+
   const token = getAuthToken();
   if (!token) {
     if (socket) {
@@ -34,13 +37,27 @@ export function getRealtimeSocket(): Socket | null {
 
   socket = io(`${WS_BASE}/realtime`, {
     auth: { token },
-    transports: ["websocket"],
+    transports: ["polling", "websocket"],
+    reconnection: true,
+    reconnectionAttempts: 3,
+    reconnectionDelay: 2000,
+    timeout: 8000,
     autoConnect: true,
   });
 
+  let failures = 0;
   socket.on("connect_error", () => {
-    socket?.disconnect();
-    socket = null;
+    failures += 1;
+    if (failures >= 3) {
+      connectDisabled = true;
+      socket?.disconnect();
+      socket = null;
+    }
+  });
+
+  socket.on("connect", () => {
+    failures = 0;
+    connectDisabled = false;
   });
 
   return socket;
@@ -49,6 +66,7 @@ export function getRealtimeSocket(): Socket | null {
 export function disconnectRealtime(): void {
   socket?.disconnect();
   socket = null;
+  connectDisabled = false;
 }
 
 export function subscribeRealtime(

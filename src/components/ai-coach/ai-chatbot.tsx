@@ -1,22 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Check, Bot, Loader2, Send, Sparkles, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { aiCoachApi } from "@/lib/api";
-import type { AiCoachMessage } from "@/lib/types";
+import type { AiCoachMessage, AiProposedAction } from "@/lib/types";
 import { ChatMessageContent } from "@/components/ai-coach/chat-message-content";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { invalidateFromRealtime } from "@/lib/realtime/invalidate";
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
   "What are my tasks for today?",
+  "Add a task: review budget (30 min)",
+  "Log my reading habit for today",
   "How much did I spend today?",
-  "Which habits did I log today?",
+  "Record an expense of 200 for lunch",
   "Summarize my goals progress",
-  "Any unread notifications?",
-  "What did I study or learn today?",
 ];
 
 function formatTime(iso: string) {
@@ -41,6 +42,8 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingActions, setPendingActions] = useState<AiProposedAction[]>([]);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -51,7 +54,7 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading, scrollToBottom]);
+  }, [messages, loading, pendingActions, scrollToBottom]);
 
   useEffect(() => {
     if (isFloating) {
@@ -72,11 +75,13 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
       setMessages((prev) => [...prev, optimisticUser]);
       setInput("");
       setLoading(true);
+      setPendingActions([]);
 
       try {
         const res = await aiCoachApi.chat(trimmed, sessionId);
         setSessionId(res.sessionId);
         setMessages(res.messages);
+        setPendingActions(res.pendingActions ?? []);
       } catch (err: unknown) {
         setMessages((prev) => prev.slice(0, -1));
         const msg = (
@@ -110,8 +115,34 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
     setMessages([]);
     setSessionId(undefined);
     setInput("");
+    setPendingActions([]);
     textareaRef.current?.focus();
   };
+
+  const confirmAction = useCallback(
+    async (action: AiProposedAction) => {
+      if (!sessionId || actionBusy) return;
+      setActionBusy(action.id);
+      try {
+        const res = await aiCoachApi.confirmAction(sessionId, action);
+        setMessages(res.messages);
+        setPendingActions([]);
+        if (res.ok) {
+          invalidateFromRealtime();
+          toast.success(res.message);
+        } else {
+          toast.error(res.message);
+        }
+      } catch {
+        toast.error("Could not complete that action");
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [sessionId, actionBusy],
+  );
+
+  const dismissActions = () => setPendingActions([]);
 
   return (
     <div
@@ -166,8 +197,8 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
               <Sparkles className="size-6" />
             </div>
             <p className="max-w-[240px] text-xs text-muted-foreground">
-              Ask anything about your real LifeOS data — expenses, tasks,
-              habits, learning, and more.
+              Ask about your real LifeOS data — or tell me to add a task, log a
+              habit, or record an expense. You confirm before anything saves.
             </p>
             <div className="flex flex-wrap justify-center gap-1.5">
               {SUGGESTIONS.map((s) => (
@@ -218,6 +249,51 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
             </div>
           );
         })}
+
+        {pendingActions.length > 0 && (
+          <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/5 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+              <Zap className="size-3.5" />
+              {pendingActions.length > 1
+                ? "Confirm these actions"
+                : "Confirm this action"}
+            </p>
+            <ul className="space-y-1.5">
+              {pendingActions.map((action) => (
+                <li
+                  key={action.id}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-background/70 px-2.5 py-1.5"
+                >
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {action.label}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 shrink-0 text-xs"
+                    disabled={!!actionBusy}
+                    onClick={() => void confirmAction(action)}
+                  >
+                    {actionBusy === action.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Check className="size-3.5" />
+                    )}
+                    Confirm
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={dismissActions}
+              disabled={!!actionBusy}
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-start">

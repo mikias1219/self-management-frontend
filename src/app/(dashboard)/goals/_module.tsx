@@ -23,6 +23,7 @@ import { useGoalsRelations } from "@/hooks/use-module-relations";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
 import { goalsApi } from "@/lib/api";
+import { LIFE_AREAS } from "@/lib/types/life-area";
 import { hasAuthToken } from "@/lib/api/client";
 import type { Goal } from "@/lib/types";
 import type { GoalLevel } from "@/lib/types/goal";
@@ -80,7 +81,13 @@ export function GoalsModule() {
     (p: { id?: string; data: Partial<Goal> }) =>
       p.id ? goalsApi.update(p.id, p.data) : goalsApi.create(p.data),
     {
-      invalidateKeys: [["goals"], ["tasks"], ["dashboard"]],
+      invalidateKeys: [
+        ["goals"],
+        ["tasks"],
+        ["dashboard"],
+        ["integrations"],
+        ["productivity"],
+      ],
       onSuccess: () => {
         setOpen(false);
         setEditGoal(null);
@@ -105,7 +112,7 @@ export function GoalsModule() {
           const n = taskCountByGoal.get(r.id) ?? 0;
           return n > 0 ? (
             <Link
-              href="/productivity?tab=plans"
+              href="/productivity?tab=tasks"
               className="text-sky-600 hover:underline"
             >
               {n} linked
@@ -192,6 +199,13 @@ export function GoalsModule() {
                   progress: Number(fd.get("progress") ?? 0),
                   targetDate: String(fd.get("targetDate") ?? "") || undefined,
                   parentId: String(fd.get("parentId") ?? "") || undefined,
+                  lifeArea:
+                    (String(fd.get("lifeArea") ?? "") as Goal["lifeArea"]) ||
+                    undefined,
+                  measurableTarget: fd.get("measurableTarget")
+                    ? Number(fd.get("measurableTarget"))
+                    : undefined,
+                  syncToCalendar: fd.get("syncToCalendar") === "on",
                 },
               });
             }}
@@ -221,6 +235,33 @@ export function GoalsModule() {
                 ]}
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormSelect
+                label="Life area"
+                name="lifeArea"
+                defaultValue={editGoal?.lifeArea ?? ""}
+                options={[
+                  { value: "", label: "None" },
+                  ...LIFE_AREAS.map((a) => ({ value: a.value, label: a.label })),
+                ]}
+              />
+              <FormField
+                label="Measurable target"
+                name="measurableTarget"
+                type="number"
+                min="0"
+                defaultValue={editGoal?.measurableTarget}
+                placeholder="e.g. 10 tasks"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="syncToCalendar"
+                defaultChecked={editGoal?.syncToCalendar !== false}
+              />
+              Add target date to Google Calendar
+            </label>
             <DialogFooter>
               <Button type="submit">Save</Button>
             </DialogFooter>

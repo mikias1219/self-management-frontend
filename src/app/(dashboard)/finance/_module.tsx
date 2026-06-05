@@ -15,6 +15,7 @@ import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { MetricChart } from "@/components/shared/metric-chart";
 import { StatCard } from "@/components/shared/stat-card";
+import { StatGrid } from "@/components/shared/stat-grid";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,7 +32,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { financeApi } from "@/lib/api";
+import { analyticsApi, financeApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import type {
   Budget,
@@ -79,6 +80,11 @@ export function FinanceModule() {
     () => financeApi.getSummary(query),
     { enabled: authenticated },
   );
+  const financeIntel = useStandData(
+    ["analytics", "finance-intelligence", query],
+    () => analyticsApi.getFinanceIntelligence(query),
+    { enabled: authenticated },
+  );
   const accounts = useStandData(["finance", "accounts"], () =>
     financeApi.accounts.getAll(),
   );
@@ -105,6 +111,8 @@ export function FinanceModule() {
   const incomeCatList = incomeCats.data ?? [];
   const { links: financeLinks } = useFinanceRelations();
   const s = summary.data;
+  const intel = financeIntel.data;
+  const currency = intel?.currency ?? accountList[0]?.currency ?? "ETB";
 
   const invalidateFinance = [
     ["finance", "summary", query],
@@ -112,6 +120,7 @@ export function FinanceModule() {
     ["finance", "transactions", query],
     ["finance", "budgets"],
     ["finance", "savings"],
+    ["dashboard", "pos"], // keep main dashboard in sync (net balance, etc.)
   ];
 
   const createTx = useStandMutation(
@@ -273,7 +282,7 @@ export function FinanceModule() {
       {
         key: "amount",
         header: "Amount",
-        cell: (r) => formatMoney(Number(r.amount)),
+        cell: (r) => formatMoney(Number(r.amount), r.currency),
       },
       {
         key: "account",
@@ -353,34 +362,39 @@ export function FinanceModule() {
         </Button>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <StatGrid>
         <StatCard
           title="Net worth"
-          value={formatMoney(s?.totals.netWorth ?? 0)}
+          value={formatMoney(s?.totals.netWorth ?? 0, currency)}
           icon={Wallet}
           loading={summary.isLoading}
         />
         <StatCard
           title="Income"
-          value={formatMoney(s?.totals.totalIncome ?? 0)}
+          value={formatMoney(intel?.monthly.income ?? s?.totals.totalIncome ?? 0, currency)}
           icon={TrendingUp}
           description={`${label}`}
           loading={summary.isLoading}
         />
         <StatCard
           title="Expenses"
-          value={formatMoney(s?.totals.totalExpense ?? 0)}
+          value={formatMoney(intel?.monthly.expense ?? s?.totals.totalExpense ?? 0, currency)}
           icon={TrendingDown}
+          description={`Burn ${formatMoney(intel?.burnRate ?? s?.totals.burnRate ?? 0, currency)}/day`}
           loading={summary.isLoading}
         />
         <StatCard
           title="Savings rate"
-          value={formatPercent(s?.totals.savingsRate ?? 0)}
+          value={formatPercent(intel?.monthly.savingsRate ?? s?.totals.savingsRate ?? 0)}
           icon={PiggyBank}
-          description={`Net ${formatMoney(s?.totals.netCashFlow ?? 0)}`}
-          loading={summary.isLoading}
+          description={
+            intel?.topOverspendCategory
+              ? `Watch ${intel.topOverspendCategory}`
+              : "Projected net"
+          }
+          loading={financeIntel.isLoading}
         />
-      </div>
+      </StatGrid>
 
       <ModuleRelations links={financeLinks} />
 
@@ -394,40 +408,131 @@ export function FinanceModule() {
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <MetricChart
-              title="Daily net cash flow"
-              data={cashFlowChart}
-              type="bar"
-              loading={summary.isLoading}
-              height={260}
-              multiColor
-            />
-            <MetricChart
-              title="Expenses by category"
-              data={expenseChart}
-              type="pie"
-              loading={summary.isLoading}
-              height={260}
-              multiColor
-            />
+        <TabsContent value="overview" className="mt-4 space-y-6">
+          {/* Clear business rule explanation */}
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+            <p className="font-medium text-primary">How tracking works</p>
+            <ol className="mt-2 list-decimal pl-5 text-muted-foreground space-y-0.5">
+              <li>Log your salary as <strong>Income</strong> → it increases your balance and counts as "received".</li>
+              <li>Create <strong>Budgets</strong> for fixed monthly costs (Rent 7,500, Groceries, etc.).</li>
+              <li>Every expense you log against a budget category updates the progress bar automatically.</li>
+              <li>What remains after your budgeted amounts = money available for savings or buffer.</li>
+            </ol>
           </div>
-          {(s?.budgets ?? []).length > 0 && (
-            <div className="space-y-3 rounded-lg border bg-card p-4">
-              <h3 className="text-sm font-medium">Budget utilization</h3>
-              {s!.budgets.map((b) => (
-                <div key={b.id} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>{b.name}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {formatMoney(b.spent)} / {formatMoney(b.amount)} (
-                      {formatPercent(b.percentUsed)})
-                    </span>
-                  </div>
-                  <Progress value={Math.min(100, b.percentUsed)} />
+
+          {/* Main tracking card */}
+          <div className="rounded-xl border bg-card p-5 space-y-6">
+            {/* Income row */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">Income received this month</p>
+                <p className="text-3xl font-semibold tabular-nums tracking-tight">
+                  {formatMoney(intel?.monthly.income ?? 0, currency)}
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setDialogMode("transaction");
+                  // The dialog will default to expense; user can change to income
+                }}
+              >
+                <Plus className="size-4" /> Log salary / income
+              </Button>
+            </div>
+
+            {/* Budgets */}
+            <div className="border-t pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-medium">Monthly budgets (planned fixed costs)</p>
+                <Button variant="ghost" size="sm" onClick={() => setPageTab("finance", "budgets")}>
+                  Manage budgets
+                </Button>
+              </div>
+
+              {(s?.budgets ?? []).length === 0 ? (
+                <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
+                  No budgets created yet. Create budgets for Rent, Food, Transport, Utilities etc. so every expense is tracked against your salary.
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-4">
+                  {s!.budgets.map((b) => (
+                    <div key={b.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{b.name}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {formatMoney(b.spent, currency)} / {formatMoney(b.amount, currency)}
+                        </span>
+                      </div>
+                      <Progress value={Math.min(100, b.percentUsed)} />
+                      <p className="text-[11px] text-muted-foreground">
+                        {b.percentUsed >= 100
+                          ? "Budget fully used"
+                          : `${formatPercent(100 - b.percentUsed)} remaining`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Remaining for savings */}
+            <div className="border-t pt-5">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Available for savings / buffer</p>
+                  <p className="text-2xl font-semibold tabular-nums text-emerald-600">
+                    {formatMoney(
+                      Math.max(
+                        0,
+                        (intel?.monthly.income ?? 0) -
+                          (s?.budgets?.reduce((sum, b) => sum + b.amount, 0) ?? 0),
+                      ),
+                      currency,
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Income received minus total budgeted amounts
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => setPageTab("finance", "savings")}>
+                  View savings goals
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "transactions")}>
+              Log an expense
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "budgets")}>
+              Create / edit budgets
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "savings")}>
+              Set a savings goal
+            </Button>
+          </div>
+
+          {/* Charts only when there is data */}
+          {intel && intel.spendingByCategory.length > 0 && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <MetricChart
+                title="Daily net cash flow"
+                data={cashFlowChart}
+                type="bar"
+                loading={summary.isLoading}
+                height={220}
+                multiColor
+              />
+              <MetricChart
+                title="Expenses by category"
+                data={expenseChart}
+                type="pie"
+                loading={summary.isLoading}
+                height={220}
+                multiColor
+              />
             </div>
           )}
         </TabsContent>
@@ -438,7 +543,7 @@ export function FinanceModule() {
             data={transactions.data ?? []}
             loading={transactions.isLoading}
             getRowId={(r) => r.id}
-            emptyMessage="No transactions in this period."
+            emptyMessage="No transactions yet. Add your salary as income, then log expenses against your budgets."
             onEdit={(row) => {
               setEditing({ type: "transaction", id: row.id });
               setDialogMode("transaction");
@@ -510,11 +615,11 @@ export function FinanceModule() {
                     </div>
                   </div>
                   <p className="mt-2 text-lg font-semibold tabular-nums">
-                    {formatMoney(spent)} / {formatMoney(amount)}
+                    {formatMoney(spent, currency)} / {formatMoney(amount, currency)}
                   </p>
                   <Progress className="mt-2" value={Math.min(100, pct)} />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Remaining {formatMoney(Math.max(0, amount - spent))}
+                    Remaining {formatMoney(Math.max(0, amount - spent), currency)}
                   </p>
                 </div>
               );
@@ -559,7 +664,7 @@ export function FinanceModule() {
                     </div>
                   </div>
                   <p className="mt-2 text-lg font-semibold tabular-nums">
-                    {formatMoney(current)} / {formatMoney(target)}
+                    {formatMoney(current, currency)} / {formatMoney(target, currency)}
                   </p>
                   <Progress className="mt-2" value={Math.min(100, pct)} />
                 </div>
@@ -759,9 +864,25 @@ function FinanceDialog({
                 accountId: String(fd.get("accountId")),
                 transactionType: type,
                 amount: Number(fd.get("amount")),
+                currency: String(fd.get("currency") ?? "ETB"),
                 transactionDate: String(fd.get("transactionDate")),
                 description: String(fd.get("description") ?? "").trim() || undefined,
                 categoryId: String(fd.get("categoryId") ?? "") || undefined,
+                incomeSource:
+                  type === "income"
+                    ? (String(fd.get("incomeSource") ?? "") as FinanceTransaction["incomeSource"]) ||
+                      undefined
+                    : undefined,
+                paymentMethod:
+                  type === "expense"
+                    ? (String(fd.get("paymentMethod") ?? "") as FinanceTransaction["paymentMethod"]) ||
+                      undefined
+                    : undefined,
+                isRecurring: fd.get("isRecurring") === "on",
+                recurringInterval: String(
+                  fd.get("recurringInterval") ?? "none",
+                ) as FinanceTransaction["recurringInterval"],
+                linkedTaskId: String(fd.get("linkedTaskId") ?? "") || undefined,
               });
             }}
           >
@@ -789,6 +910,57 @@ function FinanceDialog({
                 defaultValue={editTx?.amount}
               />
             </div>
+            <FormField
+              label="Currency"
+              name="currency"
+              defaultValue={editTx?.currency ?? "ETB"}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormSelect
+                label="Income source"
+                name="incomeSource"
+                defaultValue={editTx?.incomeSource ?? "salary"}
+                options={[
+                  { value: "salary", label: "Salary" },
+                  { value: "freelance", label: "Freelance" },
+                  { value: "business", label: "Business" },
+                  { value: "investment", label: "Investment" },
+                  { value: "gift", label: "Gift" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
+              <FormSelect
+                label="Payment method"
+                name="paymentMethod"
+                defaultValue={editTx?.paymentMethod ?? "cash"}
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "card", label: "Card" },
+                  { value: "mobile", label: "Mobile" },
+                  { value: "bank_transfer", label: "Bank transfer" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
+            </div>
+            <FormSelect
+              label="Recurring"
+              name="recurringInterval"
+              defaultValue={editTx?.recurringInterval ?? "none"}
+              options={[
+                { value: "none", label: "One-time" },
+                { value: "weekly", label: "Weekly" },
+                { value: "monthly", label: "Monthly" },
+                { value: "yearly", label: "Yearly" },
+              ]}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isRecurring"
+                defaultChecked={editTx?.isRecurring}
+              />
+              Recurring transaction
+            </label>
             <FormField
               label="Date"
               name="transactionDate"
@@ -829,7 +1001,7 @@ function FinanceDialog({
                 name: String(fd.get("name")),
                 accountType: fd.get("accountType") as AccountType,
                 balance: Number(fd.get("balance") ?? 0),
-                currency: String(fd.get("currency") ?? "USD"),
+                currency: String(fd.get("currency") ?? "ETB"),
               });
             }}
           >
@@ -856,7 +1028,7 @@ function FinanceDialog({
               <FormField
                 label="Currency"
                 name="currency"
-                defaultValue={editAccount?.currency ?? "USD"}
+                defaultValue={editAccount?.currency ?? "ETB"}
               />
             </div>
             <DialogFooter>

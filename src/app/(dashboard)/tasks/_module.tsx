@@ -4,11 +4,14 @@ import { format } from "date-fns";
 import { CheckCircle2, CheckSquare, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { ModuleShell } from "@/components/shared/module-shell";
+import { useHubEmbedded } from "@/components/hubs/hub-context";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { FormField, FormSelect, FormTextarea } from "@/components/shared/form-fields";
 import { ModuleRelations } from "@/components/shared/module-relations";
 import { StatCard } from "@/components/shared/stat-card";
+import { StatGrid } from "@/components/shared/stat-grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +26,8 @@ import { Label } from "@/components/ui/label";
 import { useTasksRelations } from "@/hooks/use-module-relations";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { goalsApi, tasksApi } from "@/lib/api";
+import { analyticsApi, goalsApi, tasksApi } from "@/lib/api";
+import { LIFE_AREAS } from "@/lib/types/life-area";
 import { hasAuthToken } from "@/lib/api/client";
 import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@/lib/types/task";
@@ -42,12 +46,14 @@ function formatMinutes(m: number) {
 }
 
 export function TasksModule() {
+  const embedded = useHubEmbedded();
   const { query, label } = usePeriod();
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [reportTask, setReportTask] = useState<Task | null>(null);
   const [reportMinutes, setReportMinutes] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: allTasks, isLoading } = useStandData(
     ["tasks"],
@@ -68,11 +74,17 @@ export function TasksModule() {
     [allTasks, query],
   );
 
+  const { data: taskIntel } = useStandData(
+    ["analytics", "task-intelligence"],
+    () => analyticsApi.getTaskIntelligence(),
+    { enabled: authenticated },
+  );
+
   const stats = useMemo(() => {
-    const pending = tasks.filter(
+    const pending = taskIntel?.metrics.openCount ?? tasks.filter(
       (t) => t.taskStatus === "todo" || t.taskStatus === "in_progress",
     ).length;
-    const done = tasks.filter((t) => t.taskStatus === "done").length;
+    const done = taskIntel?.metrics.completedThisWeek ?? tasks.filter((t) => t.taskStatus === "done").length;
     const plannedMin = tasks.reduce((s, t) => s + (t.estimatedMinutes ?? 0), 0);
     const achievedMin = tasks
       .filter((t) => t.taskStatus === "done")
@@ -84,10 +96,21 @@ export function TasksModule() {
             : (t.estimatedMinutes ?? 0)),
         0,
       );
-    const fulfillment =
-      plannedMin > 0 ? Math.round((achievedMin / plannedMin) * 100) : 0;
-    return { pending, done, plannedMin, achievedMin, fulfillment, total: tasks.length };
-  }, [tasks]);
+    const fulfillment = taskIntel?.metrics.completionRate ?? (
+      plannedMin > 0 ? Math.round((achievedMin / plannedMin) * 100) : 0
+    );
+    return {
+      pending,
+      done,
+      plannedMin,
+      achievedMin,
+      fulfillment,
+      total: tasks.length,
+      overdue: taskIntel?.metrics.overdueCount ?? 0,
+      productivity: taskIntel?.metrics.productivityScore ?? 0,
+      velocity: taskIntel?.metrics.dailyVelocity ?? 0,
+    };
+  }, [tasks, taskIntel]);
 
   const invalidate = [
     ["tasks"],
@@ -95,6 +118,9 @@ export function TasksModule() {
     ["dashboard"],
     ["achievements"],
     ["activity-logs"],
+    ["integrations"],
+    ["productivity"],
+    ["analytics"],
   ];
 
   const save = useStandMutation(
@@ -104,10 +130,18 @@ export function TasksModule() {
         : tasksApi.create(payload.data),
     {
       invalidateKeys: invalidate,
-      onSuccess: () => {
+      onSuccess: (task: Task) => {
         setOpen(false);
         setEditTask(null);
-        toast.success(editTask ? "Plan updated" : "Plan created");
+        if (task.syncToCalendar) {
+          if (task.googleCalendarEventId) {
+            toast.success(editTask ? "Plan updated — synced to Google" : "Plan created — synced to Google");
+          } else {
+            toast.warning("Saved — connect Google Calendar on Today for instant sync");
+          }
+        } else {
+          toast.success(editTask ? "Plan updated" : "Plan created");
+        }
       },
       onError: () => toast.error("Failed to save"),
     },
@@ -115,7 +149,11 @@ export function TasksModule() {
 
   const remove = useStandMutation((id: string) => tasksApi.remove(id), {
     invalidateKeys: invalidate,
-    onSuccess: () => toast.success("Deleted"),
+    onSuccess: () => {
+      setDeleteId(null);
+      toast.success("Task deleted — removed from Google Calendar when synced");
+    },
+    onError: () => toast.error("Could not delete task"),
   });
 
   const report = useStandMutation(
@@ -170,6 +208,15 @@ export function TasksModule() {
           ),
       },
       {
+        key: "area",
+        header: "Life area",
+        cell: (r) => (
+          <span className="capitalize text-xs text-muted-foreground">
+            {r.lifeArea ?? "—"}
+          </span>
+        ),
+      },
+      {
         key: "status",
         header: "Status",
         cell: (r) => (
@@ -183,6 +230,18 @@ export function TasksModule() {
         header: "Due",
         cell: (r) =>
           r.dueDate ? format(new Date(r.dueDate), "MMM d") : "—",
+      },
+      {
+        key: "calendar",
+        header: "Google",
+        cell: (r) =>
+          r.googleCalendarEventId ? (
+            <span className="text-xs text-emerald-600 font-medium">Synced</span>
+          ) : r.syncToCalendar ? (
+            <span className="text-xs text-amber-600">Not synced</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Off</span>
+          ),
       },
       {
         key: "report",
@@ -240,13 +299,38 @@ export function TasksModule() {
         </Button>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard title="Plans" value={stats.total} loading={isLoading} />
-        <StatCard title="Planned time" value={formatMinutes(stats.plannedMin)} loading={isLoading} />
-        <StatCard title="Achieved time" value={formatMinutes(stats.achievedMin)} loading={isLoading} />
-        <StatCard title="Fulfillment" value={`${stats.fulfillment}%`} loading={isLoading} />
-        <StatCard title="Pending" value={stats.pending} loading={isLoading} />
-      </div>
+      <StatGrid>
+        <StatCard title="Open tasks" value={stats.pending} loading={isLoading} />
+        <StatCard title="Overdue" value={stats.overdue} loading={isLoading} />
+        <StatCard
+          title="Completion rate"
+          value={`${stats.fulfillment}%`}
+          description={`${stats.done} done this week`}
+          loading={isLoading}
+        />
+        <StatCard
+          title="Productivity"
+          value={`${stats.productivity}/100`}
+          description={`${stats.velocity} tasks/day`}
+          loading={isLoading}
+        />
+      </StatGrid>
+
+      {taskIntel && taskIntel.overdue.length > 0 && (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-4 text-sm">
+          <p className="font-medium text-rose-700 mb-2">Overdue — focus here</p>
+          <ul className="space-y-1">
+            {taskIntel.overdue.slice(0, 5).map((t) => (
+              <li key={t.id} className="flex justify-between gap-2">
+                <span>{t.title}</span>
+                <span className="text-muted-foreground shrink-0">
+                  {t.daysOverdue}d late
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <ModuleRelations links={relationLinks} />
 
@@ -259,9 +343,7 @@ export function TasksModule() {
           setEditTask(row);
           setOpen(true);
         }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this plan?")) remove.mutate(row.id);
-        }}
+        onDelete={(row) => setDeleteId(row.id)}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -283,10 +365,16 @@ export function TasksModule() {
                   String(fd.get("description") ?? "").trim() || undefined,
                 taskStatus: fd.get("taskStatus") as TaskStatus,
                 priority: fd.get("priority") as TaskPriority,
+                startDate: String(fd.get("startDate") ?? "") || undefined,
                 dueDate: String(fd.get("dueDate") ?? "") || undefined,
+                lifeArea:
+                  (String(fd.get("lifeArea") ?? "") as Task["lifeArea"]) ||
+                  undefined,
                 category: String(fd.get("category") ?? "").trim() || undefined,
                 goalId: String(fd.get("goalId") ?? "") || undefined,
+                scheduledAt: String(fd.get("scheduledAt") ?? "") || undefined,
                 estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : undefined,
+                syncToCalendar: fd.get("syncToCalendar") === "on",
               };
               save.mutate({ id: editTask?.id, data });
             }}
@@ -353,6 +441,12 @@ export function TasksModule() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <FormField
+                label="Start date"
+                name="startDate"
+                type="date"
+                defaultValue={editTask?.startDate?.slice(0, 10)}
+              />
+              <FormField
                 label="Due date"
                 name="dueDate"
                 type="date"
@@ -360,6 +454,17 @@ export function TasksModule() {
                   editTask?.dueDate?.slice(0, 10) ??
                   format(new Date(), "yyyy-MM-dd")
                 }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormSelect
+                label="Life area"
+                name="lifeArea"
+                defaultValue={editTask?.lifeArea ?? "personal"}
+                options={LIFE_AREAS.map((a) => ({
+                  value: a.value,
+                  label: a.label,
+                }))}
               />
               <FormSelect
                 label="Linked goal"
@@ -380,6 +485,26 @@ export function TasksModule() {
               defaultValue={editTask?.category}
               placeholder="spiritual, work…"
             />
+            <FormField
+              label="Scheduled (for Google Calendar)"
+              name="scheduledAt"
+              type="datetime-local"
+              defaultValue={
+                editTask?.scheduledAt?.slice(0, 16) ??
+                editTask?.dueDate?.slice(0, 16)
+              }
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="syncToCalendar"
+                defaultChecked={editTask?.syncToCalendar !== false}
+              />
+              Sync to Google Calendar when saved
+            </label>
+            {editTask?.googleCalendarEventId && (
+              <p className="text-xs text-emerald-600">Linked to Google Calendar</p>
+            )}
             <DialogFooter>
               <Button type="submit" disabled={save.isPending}>
                 Save plan
@@ -438,6 +563,15 @@ export function TasksModule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Delete this task?"
+        description="Removes from LifeOS and deletes the Google Calendar event if it was synced."
+        onConfirm={() => deleteId && remove.mutate(deleteId)}
+        loading={remove.isPending}
+      />
     </ModuleShell>
   );
 }

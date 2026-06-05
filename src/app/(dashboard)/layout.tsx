@@ -6,7 +6,6 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { useAccentFromSettings } from "@/hooks/use-accent-from-settings";
 import { hasAuthToken } from "@/lib/api/client";
 import { useStandUi } from "@/stores/use-stand";
-import { getRealtimeSocket } from "@/lib/realtime/socket";
 
 export default function ProtectedDashboardLayout({
   children,
@@ -26,7 +25,6 @@ export default function ProtectedDashboardLayout({
       return;
     }
     setAuthReady(true);
-    getRealtimeSocket();
   }, [router, pathname, setAuthReady]);
 
   if (!ready) {

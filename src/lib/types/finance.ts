@@ -15,13 +15,36 @@ export interface FinanceAccount extends BaseEntity {
   currency: string;
 }
 
+export type IncomeSource =
+  | "salary"
+  | "freelance"
+  | "business"
+  | "investment"
+  | "gift"
+  | "other";
+
+export type PaymentMethod =
+  | "cash"
+  | "card"
+  | "mobile"
+  | "bank_transfer"
+  | "other";
+
+export type RecurringInterval = "none" | "weekly" | "monthly" | "yearly";
+
 export interface FinanceTransaction extends BaseEntity {
   accountId: string;
   transactionType: TransactionType;
   amount: number;
+  currency?: string;
   transactionDate: string;
   description?: string;
   categoryId?: string;
+  incomeSource?: IncomeSource;
+  paymentMethod?: PaymentMethod;
+  isRecurring?: boolean;
+  recurringInterval?: RecurringInterval;
+  linkedTaskId?: string;
 }
 
 export interface Budget extends BaseEntity {
@@ -88,6 +111,9 @@ export interface FinanceSummary {
     totalSavingsCurrent: number;
     accountCount: number;
     transactionCount: number;
+    burnRate?: number;
+    forecastEndOfMonthExpense?: number;
+    forecastEndOfMonthNet?: number;
   };
   budgets: FinanceSummaryBudget[];
   savingsGoals: FinanceSummarySavingsGoal[];

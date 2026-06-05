@@ -17,7 +17,7 @@ const HUBS = [
     href: "/productivity",
     icon: ListChecks,
     color: "bg-sky-500/15 text-sky-600",
-    summary: "Plans & tasks, goals, habits, daily reviews",
+    summary: "Today, progress, tasks, goals, habits, and review",
     manageLabel: "Manage productivity",
   },
   {

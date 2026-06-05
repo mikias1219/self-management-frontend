@@ -2,7 +2,11 @@
 
 import { Suspense } from "react";
 import { HubProvider } from "@/components/hubs/hub-context";
-import { HubLayout, type HubTab } from "@/components/hubs/hub-layout";
+import {
+  HubLayout,
+  type HubTab,
+  type HubTabGroup,
+} from "@/components/hubs/hub-layout";
 import type { LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -12,6 +16,7 @@ interface HubPageShellProps {
   icon: LucideIcon;
   iconClassName?: string;
   tabs: HubTab[];
+  tabGroups?: HubTabGroup[];
   defaultTab: string;
   panels: Record<string, React.ComponentType>;
   /** Nested in dashboard — tabs only, no duplicate hub header */
@@ -24,6 +29,7 @@ function HubPageInner({
   icon,
   iconClassName,
   tabs,
+  tabGroups,
   defaultTab,
   panels,
   compact,
@@ -45,6 +51,7 @@ function HubPageInner({
       icon={icon}
       iconClassName={iconClassName}
       tabs={tabs}
+      tabGroups={tabGroups}
       defaultTab={defaultTab}
       compact={compact}
     >

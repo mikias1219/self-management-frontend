@@ -1,6 +1,6 @@
 import type { BaseEntity } from "./common";
 
-export type HabitFrequency = "daily" | "weekly" | "monthly";
+export type HabitFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
 export interface Habit extends BaseEntity {
   name: string;
@@ -10,6 +10,9 @@ export interface Habit extends BaseEntity {
   currentStreak: number;
   bestStreak: number;
   color?: string;
+  reminderTime?: string;
+  syncToCalendar?: boolean;
+  googleCalendarEventId?: string;
 }
 
 export interface HabitLog extends BaseEntity {

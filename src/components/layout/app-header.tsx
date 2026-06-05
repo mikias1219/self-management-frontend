@@ -1,7 +1,6 @@
 "use client";
 
-import { Bell, LogOut, User } from "lucide-react";
-import { ModuleSearch } from "@/components/layout/module-search";
+import { Bell, LogOut, Settings as SettingsIcon, User, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { authApi, notificationsApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
-import { PeriodFilter } from "@/components/shared/period-filter";
 import { useStandData } from "@/hooks/use-stand-data";
 
 interface AppHeaderProps {
@@ -47,10 +45,7 @@ export function AppHeader({ title }: AppHeaderProps) {
           {title}
         </h1>
       )}
-      <div className="ml-auto flex min-w-0 flex-1 items-center gap-2 sm:max-w-xs md:max-w-sm">
-        <ModuleSearch />
-      </div>
-      <PeriodFilter className="max-w-full shrink-0 overflow-x-auto" />
+      <div className="ml-auto" />
       <Button
         variant="ghost"
         size="icon-sm"
@@ -70,6 +65,7 @@ export function AppHeader({ title }: AppHeaderProps) {
           render={
             <Button variant="ghost" size="icon-sm" className="rounded-full">
               <Avatar className="size-7">
+                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
                 <AvatarFallback className="text-xs">
                   {user?.displayName?.[0]?.toUpperCase() ?? (
                     <User className="size-3.5" />
@@ -79,17 +75,36 @@ export function AppHeader({ title }: AppHeaderProps) {
             </Button>
           }
         />
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-56">
           {user && (
             <>
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{user.displayName}</p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
+              <div className="flex items-center gap-2.5 px-2 py-2">
+                <Avatar className="size-9">
+                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+                  <AvatarFallback className="text-sm">
+                    {user.displayName?.[0]?.toUpperCase() ?? (
+                      <User className="size-4" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {user.displayName}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                  </p>
+                </div>
               </div>
               <DropdownMenuSeparator />
             </>
           )}
+          <DropdownMenuItem onClick={() => router.push("/profile")}>
+            <UserRound className="size-4" />
+            Profile
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <SettingsIcon className="size-4" />
             Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />

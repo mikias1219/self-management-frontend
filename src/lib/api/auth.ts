@@ -1,5 +1,13 @@
 import { apiClient, setAuthToken } from "./client";
-import type { AuthResponse, LoginPayload, RegisterPayload, User } from "@/lib/types";
+import type {
+  AuthResponse,
+  ChangePasswordPayload,
+  LoginPayload,
+  RegisterPayload,
+  ResetPasswordPayload,
+  UpdateProfilePayload,
+  User,
+} from "@/lib/types";
 
 export const authApi = {
   login: async (payload: LoginPayload) => {
@@ -16,6 +24,16 @@ export const authApi = {
     return data;
   },
   me: () => apiClient.get<User>("/auth/me").then((r) => r.data),
+  updateProfile: (payload: UpdateProfilePayload) =>
+    apiClient.patch<User>("/auth/me", payload).then((r) => r.data),
+  changePassword: (payload: ChangePasswordPayload) =>
+    apiClient
+      .post<{ success: true }>("/auth/change-password", payload)
+      .then((r) => r.data),
+  resetPassword: (payload: ResetPasswordPayload) =>
+    apiClient
+      .post<{ success: true }>("/auth/reset-password", payload)
+      .then((r) => r.data),
   logout: () => {
     setAuthToken(null);
   },

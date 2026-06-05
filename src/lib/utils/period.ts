@@ -67,7 +67,7 @@ export function filterByDateField<T>(
   });
 }
 
-export function formatMoney(amount: number, currency = "USD"): string {
+export function formatMoney(amount: number, currency = "ETB"): string {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,

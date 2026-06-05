@@ -1,4 +1,5 @@
 import type { BaseEntity } from "./common";
+import type { LifeArea } from "./life-area";
 
 export type GoalLevel =
   | "vision"
@@ -16,4 +17,8 @@ export interface Goal extends BaseEntity {
   targetDate?: string;
   progress: number;
   category?: string;
+  lifeArea?: LifeArea;
+  measurableTarget?: number;
+  syncToCalendar?: boolean;
+  googleCalendarEventId?: string;
 }

@@ -4,20 +4,54 @@ import {
   LineChart,
   ListChecks,
 } from "lucide-react";
-import { DailyReviewsModule } from "@/app/(dashboard)/daily-reviews/_module";
-import { GoalsModule } from "@/app/(dashboard)/goals/_module";
-import { HabitsModule } from "@/app/(dashboard)/habits/_module";
-import { TasksModule } from "@/app/(dashboard)/tasks/_module";
-import { EnglishModule } from "@/app/(dashboard)/english/_module";
-import { LearningModule } from "@/app/(dashboard)/learning/_module";
-import { FinanceModule } from "@/app/(dashboard)/finance/_module";
-import { HealthModule } from "@/app/(dashboard)/health/_module";
-import { JournalModule } from "@/app/(dashboard)/journal/_module";
-import { SpiritualModule } from "@/app/(dashboard)/spiritual/_module";
-import { AnalyticsModule } from "@/app/(dashboard)/analytics/_module";
-import { ActivityLogsModule } from "@/app/(dashboard)/activity-logs/_module";
-import type { HubTab } from "@/components/hubs/hub-layout";
+import dynamic from "next/dynamic";
+import type { HubTab, HubTabGroup } from "@/components/hubs/hub-layout";
 import type { LucideIcon } from "lucide-react";
+
+// Lazy-load every module panel (they are all named exports).
+// This dramatically speeds up initial compilation of hubs.
+const ProductivityTodayModule = dynamic(() =>
+  import("@/app/(dashboard)/productivity/_today-module").then((m) => m.ProductivityTodayModule),
+);
+const ProductivityProgressModule = dynamic(() =>
+  import("@/app/(dashboard)/productivity/_progress-module").then((m) => m.ProductivityProgressModule),
+);
+const TasksModule = dynamic(() =>
+  import("@/app/(dashboard)/tasks/_module").then((m) => m.TasksModule),
+);
+const GoalsModule = dynamic(() =>
+  import("@/app/(dashboard)/goals/_module").then((m) => m.GoalsModule),
+);
+const HabitsModule = dynamic(() =>
+  import("@/app/(dashboard)/habits/_module").then((m) => m.HabitsModule),
+);
+const DailyReviewsModule = dynamic(() =>
+  import("@/app/(dashboard)/daily-reviews/_module").then((m) => m.DailyReviewsModule),
+);
+const LearningModule = dynamic(() =>
+  import("@/app/(dashboard)/learning/_module").then((m) => m.LearningModule),
+);
+const EnglishModule = dynamic(() =>
+  import("@/app/(dashboard)/english/_module").then((m) => m.EnglishModule),
+);
+const FinanceModule = dynamic(() =>
+  import("@/app/(dashboard)/finance/_module").then((m) => m.FinanceModule),
+);
+const HealthModule = dynamic(() =>
+  import("@/app/(dashboard)/health/_module").then((m) => m.HealthModule),
+);
+const SpiritualModule = dynamic(() =>
+  import("@/app/(dashboard)/spiritual/_module").then((m) => m.SpiritualModule),
+);
+const JournalModule = dynamic(() =>
+  import("@/app/(dashboard)/journal/_module").then((m) => m.JournalModule),
+);
+const AnalyticsModule = dynamic(() =>
+  import("@/app/(dashboard)/analytics/_module").then((m) => m.AnalyticsModule),
+);
+const ActivityLogsModule = dynamic(() =>
+  import("@/app/(dashboard)/activity-logs/_module").then((m) => m.ActivityLogsModule),
+);
 
 export interface HubConfig {
   title: string;
@@ -25,6 +59,7 @@ export interface HubConfig {
   icon: LucideIcon;
   iconClassName: string;
   tabs: HubTab[];
+  tabGroups?: HubTabGroup[];
   defaultTab: string;
   panels: Record<string, React.ComponentType>;
 }
@@ -32,40 +67,55 @@ export interface HubConfig {
 export const PRODUCTIVITY_HUB: HubConfig = {
   title: "Productivity",
   subtitle:
-    "Goals set direction, habits build rhythm, tasks and plans are what you do today, and daily reviews close the loop.",
+    "Plan your day, track momentum, and manage tasks, goals, habits, and reviews in one place.",
   icon: ListChecks,
   iconClassName: "bg-sky-500/15 text-sky-600",
+  tabGroups: [
+    { label: "Focus", tabIds: ["today", "progress"] },
+    { label: "Manage", tabIds: ["tasks", "goals", "habits", "review"] },
+  ],
   tabs: [
     {
-      id: "plans",
-      label: "Plans & tasks",
+      id: "today",
+      label: "Today",
       description:
-        "Daily plans with time estimates — report how long you actually spent when done.",
+        "Today's schedule — tasks, calendar events, and your daily score.",
+    },
+    {
+      id: "progress",
+      label: "Progress",
+      description:
+        "Success score and trends across day, week, month, and year.",
+    },
+    {
+      id: "tasks",
+      label: "Tasks",
+      description: "All tasks — create, edit, due dates, and time tracking.",
     },
     {
       id: "goals",
       label: "Goals",
-      description:
-        "Vision → yearly → quarterly → monthly → weekly → daily. Progress rolls up from tasks.",
+      description: "Daily through yearly goals with measurable progress.",
     },
     {
       id: "habits",
       label: "Habits",
-      description:
-        "Recurring behaviors you track; different from one-off tasks or goals.",
+      description: "Routines, streaks, and daily check-ins.",
     },
     {
-      id: "reviews",
-      label: "Daily review",
-      description: "End-of-day reflection: wins, lessons, and tomorrow’s focus.",
+      id: "review",
+      label: "Review",
+      description: "End-of-day reflection and mood.",
     },
   ],
-  defaultTab: "plans",
+  defaultTab: "today",
   panels: {
-    plans: TasksModule,
+    today: ProductivityTodayModule,
+    progress: ProductivityProgressModule,
+    tasks: TasksModule,
     goals: GoalsModule,
     habits: HabitsModule,
-    reviews: DailyReviewsModule,
+    review: DailyReviewsModule,
   },
 };
 
@@ -97,55 +147,55 @@ export const GROWTH_HUB: HubConfig = {
 export const LIFE_HUB: HubConfig = {
   title: "Life",
   subtitle:
-    "Money, body, spirit, and reflection — the areas that balance your day-to-day living.",
+    "Finance, health, spiritual practice, and journaling — the personal side of your stand.",
   icon: HeartHandshake,
-  iconClassName: "bg-amber-500/15 text-amber-700",
+  iconClassName: "bg-rose-500/15 text-rose-600",
   tabs: [
     {
       id: "finance",
       label: "Finance",
-      description: "Income, expenses, budgets, and net worth.",
-    },
-    {
-      id: "spiritual",
-      label: "Spiritual",
-      description: "Prayer, scripture, and spiritual practices.",
+      description: "Accounts, budgets, transactions, and savings.",
     },
     {
       id: "health",
       label: "Health",
-      description: "Workouts, sleep, nutrition, and vitals.",
+      description: "Workouts, metrics, and wellness tracking.",
+    },
+    {
+      id: "spiritual",
+      label: "Spiritual",
+      description: "Prayer, scripture, and faith practices.",
     },
     {
       id: "journal",
       label: "Journal",
-      description: "Free-form notes and life events.",
+      description: "Daily entries and reflections.",
     },
   ],
   defaultTab: "finance",
   panels: {
     finance: FinanceModule,
-    spiritual: SpiritualModule,
     health: HealthModule,
+    spiritual: SpiritualModule,
     journal: JournalModule,
   },
 };
 
 export const INSIGHTS_HUB: HubConfig = {
   title: "Insights",
-  subtitle: "See patterns in analytics and drill into every logged action.",
+  subtitle: "Analytics and activity history across your LifeOS data.",
   icon: LineChart,
-  iconClassName: "bg-fuchsia-500/15 text-fuchsia-600",
+  iconClassName: "bg-violet-500/15 text-violet-600",
   tabs: [
     {
       id: "analytics",
       label: "Analytics",
-      description: "Trends and charts across your data.",
+      description: "Charts and cross-module metrics.",
     },
     {
       id: "activity",
       label: "Activity log",
-      description: "Timeline of what you completed and logged.",
+      description: "Audit trail of actions and completions.",
     },
   ],
   defaultTab: "analytics",

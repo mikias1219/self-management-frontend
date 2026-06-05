@@ -1,7 +1,7 @@
 import { apiClient } from "./client";
-import type { DashboardOverview } from "@/lib/types";
+import type { PosDashboardOverview } from "@/lib/types";
 
 export const dashboardApi = {
   getOverview: () =>
-    apiClient.get<DashboardOverview>("/dashboard").then((r) => r.data),
+    apiClient.get<PosDashboardOverview>("/dashboard").then((r) => r.data),
 };

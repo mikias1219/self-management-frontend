@@ -17,3 +17,5 @@ export * from "./activity-logs";
 export * from "./notifications";
 export * from "./settings";
 export * from "./ai-coach";
+export * from "./integrations";
+export * from "./productivity";
