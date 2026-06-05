@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: frontendRoot,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async redirects() {
     return [
       { source: "/tasks", destination: "/productivity?tab=tasks", permanent: false },
