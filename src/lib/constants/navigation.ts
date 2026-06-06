@@ -79,31 +79,10 @@ export const NAV_ITEMS: NavItem[] = [
     color: "bg-fuchsia-500/15 text-fuchsia-600",
     description: "Analytics and activity log",
   },
-  {
-    title: "Profile",
-    href: "/profile",
-    icon: UserRound,
-    group: "System",
-    color: "bg-indigo-500/15 text-indigo-600",
-    description: "Your identity, focus areas, and life stats",
-  },
-  {
-    title: "Notifications",
-    href: "/notifications",
-    icon: Bell,
-    group: "System",
-    color: "bg-slate-500/15 text-slate-600",
-  },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-    group: "System",
-    color: "bg-neutral-500/15 text-neutral-600",
-  },
 ];
 
-export const NAV_GROUPS = ["Overview", "Life areas", "System"] as const;
+/** @deprecated Sidebar is flat — kept for legacy references. */
+export const NAV_GROUPS = ["Overview", "Life areas"] as const;
 
 /** Deep links for header search (hub + tab). */
 export const NAV_SEARCH_EXTRAS: NavItem[] = [
@@ -204,6 +183,28 @@ export const NAV_SEARCH_EXTRAS: NavItem[] = [
     icon: LineChart,
     group: "Insights",
     color: "bg-pink-500/15 text-pink-600",
+  },
+  {
+    title: "Profile",
+    href: "/profile",
+    icon: UserRound,
+    group: "System",
+    color: "bg-indigo-500/15 text-indigo-600",
+    description: "Your identity, focus areas, and life stats",
+  },
+  {
+    title: "Notifications",
+    href: "/notifications",
+    icon: Bell,
+    group: "System",
+    color: "bg-slate-500/15 text-slate-600",
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: Settings,
+    group: "System",
+    color: "bg-neutral-500/15 text-neutral-600",
   },
 ];
 

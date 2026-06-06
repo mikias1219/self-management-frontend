@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowRightLeft,
   Calendar,
+  ChevronDown,
   DollarSign,
   PiggyBank,
   Plus,
@@ -36,6 +37,12 @@ import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-di
 import { colorForModuleKey } from "@/lib/constants/chart-colors";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
 import { analyticsApi } from "@/lib/api/analytics";
@@ -56,6 +63,7 @@ import type { FinanceSummaryObligation } from "@/lib/types/finance";
 import { CHART_PALETTE } from "@/lib/constants/chart-colors";
 import { getApiErrorMessage } from "@/lib/utils/api-error";
 import { formatMoney, formatPercent } from "@/lib/utils/period";
+import { cn } from "@/lib/utils";
 import { useStandUi } from "@/stores/use-stand";
 
 const MetricChart = dynamic(
@@ -688,10 +696,14 @@ export function FinanceModule() {
       <ModuleRelations links={financeLinks} />
 
       <Tabs value={pageTab} onValueChange={(v) => setPageTab("finance", v)}>
-        <div className="space-y-2">
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
             {dailyTabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="text-sm">
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="h-8 rounded-full px-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
                 {tab.label}
                 {"badge" in tab && tab.badge > 0 && (
                   <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
@@ -701,21 +713,34 @@ export function FinanceModule() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Manage
-            </span>
-            {manageTabs.map((tab) => (
-              <Button
-                key={tab.id}
-                size="xs"
-                variant={pageTab === tab.id ? "secondary" : "ghost"}
-                onClick={() => setPageTab("finance", tab.id)}
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    "ml-auto h-8 gap-1 rounded-full text-xs text-muted-foreground",
+                    manageTabs.some((t) => t.id === pageTab) &&
+                      "bg-muted text-foreground",
+                  )}
+                >
+                  Manage
+                  <ChevronDown className="size-3.5 opacity-60" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              {manageTabs.map((tab) => (
+                <DropdownMenuItem
+                  key={tab.id}
+                  onClick={() => setPageTab("finance", tab.id)}
+                >
+                  {tab.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {pageTab === "overview" && (

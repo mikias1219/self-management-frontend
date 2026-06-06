@@ -34,8 +34,8 @@ export const PRODUCTIVITY_HUB: HubConfig = {
   icon: ListChecks,
   iconClassName: "bg-sky-500/15 text-sky-600",
   tabGroups: [
-    { label: "Focus", tabIds: ["today", "progress"] },
-    { label: "Manage", tabIds: ["tasks", "goals", "habits", "review"] },
+    { label: "Focus", tabIds: ["today"] },
+    { label: "Manage", tabIds: ["progress", "tasks", "goals", "habits", "review"] },
   ],
   tabs: [
     {

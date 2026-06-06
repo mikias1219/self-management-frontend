@@ -30,10 +30,6 @@ export const LIFE_HUB: HubConfig = {
     "Finance, health, spiritual practice, and journaling — the personal side of your stand.",
   icon: HeartHandshake,
   iconClassName: "bg-rose-500/15 text-rose-600",
-  tabGroups: [
-    { label: "Primary", tabIds: ["finance"] },
-    { label: "Lifestyle", tabIds: ["health", "spiritual", "journal"] },
-  ],
   tabs: [
     {
       id: "finance",

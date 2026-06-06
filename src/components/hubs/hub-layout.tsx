@@ -43,16 +43,13 @@ interface HubLayoutProps {
   children: (activeTab: string) => React.ReactNode;
 }
 
-function tabTriggerClass(tab: HubTab, active: boolean) {
-  if (tab.primary) {
-    return cn(
-      "text-sm font-semibold px-4 py-2",
-      active
-        ? "bg-primary text-primary-foreground shadow-sm"
-        : "bg-primary/10 text-primary hover:bg-primary/15",
-    );
-  }
-  return "text-xs sm:text-sm";
+function secondaryTabClass(active: boolean) {
+  return cn(
+    "h-7 rounded-full px-3 text-xs font-normal",
+    active
+      ? "bg-muted text-foreground shadow-none"
+      : "bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+  );
 }
 
 export function HubLayout({
@@ -91,18 +88,125 @@ export function HubLayout({
   );
 
   const activeMeta = tabs.find((t) => t.id === activeTab);
+  const primaryTab = tabs.find((t) => t.primary);
+  const secondaryTabs = primaryTab
+    ? tabs.filter((t) => !t.primary)
+    : tabs;
 
-  const renderTab = (t: HubTab) => {
+  const renderSecondaryTab = (t: HubTab) => {
     const TabIcon = t.icon;
     return (
       <TabsTrigger
         key={t.id}
         value={t.id}
-        className={tabTriggerClass(t, activeTab === t.id)}
+        className={secondaryTabClass(activeTab === t.id)}
       >
-        {TabIcon && <TabIcon className="mr-1.5 size-3.5 shrink-0" />}
+        {TabIcon && <TabIcon className="mr-1 size-3 shrink-0" />}
         {t.label}
       </TabsTrigger>
+    );
+  };
+
+  const renderFlatTabs = () => (
+    <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
+      {tabs.map(renderSecondaryTab)}
+    </TabsList>
+  );
+
+  const renderPrimaryLayout = () => {
+    if (!primaryTab) return renderFlatTabs();
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={activeTab === primaryTab.id ? "default" : "secondary"}
+          className={cn(
+            "h-8 rounded-full px-4 font-semibold",
+            activeTab !== primaryTab.id && "bg-primary/10 text-primary hover:bg-primary/15",
+          )}
+          onClick={() => setTab(primaryTab.id)}
+        >
+          {primaryTab.label}
+        </Button>
+        <div className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+        <TabsList className="flex h-auto flex-wrap justify-start gap-0.5 bg-transparent p-0">
+          {secondaryTabs.map(renderSecondaryTab)}
+        </TabsList>
+      </div>
+    );
+  };
+
+  const renderGroupedTabs = () => {
+    if (!tabGroups?.length) return renderPrimaryLayout();
+
+    const primaryGroup = tabGroups.find((g) =>
+      g.tabIds.some((id) => tabs.find((t) => t.id === id)?.primary),
+    );
+    const primaryFromGroup = primaryGroup
+      ? tabs.find(
+          (t) => t.primary && primaryGroup.tabIds.includes(t.id),
+        )
+      : primaryTab;
+
+    const secondaryFromGroups = tabGroups.flatMap((group) =>
+      tabs.filter(
+        (t) => group.tabIds.includes(t.id) && t.id !== primaryFromGroup?.id,
+      ),
+    );
+
+    const uniqueSecondary = secondaryFromGroups.filter(
+      (t, i, arr) => arr.findIndex((x) => x.id === t.id) === i,
+    );
+
+    if (!primaryFromGroup) {
+      return (
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-0.5 bg-transparent p-0">
+          {uniqueSecondary.map(renderSecondaryTab)}
+        </TabsList>
+      );
+    }
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={activeTab === primaryFromGroup.id ? "default" : "secondary"}
+          className={cn(
+            "h-8 rounded-full px-4 font-semibold",
+            activeTab !== primaryFromGroup.id &&
+              "bg-primary/10 text-primary hover:bg-primary/15",
+          )}
+          onClick={() => setTab(primaryFromGroup.id)}
+        >
+          {primaryFromGroup.label}
+        </Button>
+        <div className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+        <TabsList className="flex h-auto flex-wrap justify-start gap-0.5 bg-transparent p-0">
+          {uniqueSecondary.map(renderSecondaryTab)}
+        </TabsList>
+        <div className="w-full sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" className="w-full justify-between">
+                  {tabs.find((t) => t.id === activeTab)?.label ?? "More tabs"}
+                  <ChevronDown className="size-4 opacity-60" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent className="w-[var(--anchor-width)]">
+              {uniqueSecondary.map((t) => (
+                <DropdownMenuItem key={t.id} onClick={() => setTab(t.id)}>
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     );
   };
 
@@ -128,66 +232,11 @@ export function HubLayout({
       )}
 
       <Tabs value={activeTab} onValueChange={setTab}>
-        {tabGroups?.length ? (
-          <div className="space-y-3 rounded-2xl border border-border/50 bg-muted/20 p-3">
-            {tabGroups.map((group) => {
-              const groupTabs = tabs.filter((t) =>
-                group.tabIds.includes(t.id),
-              );
-              if (groupTabs.length === 0) return null;
-              const isManageGroup =
-                group.label.toLowerCase() === "manage" ||
-                group.label.toLowerCase() === "lifestyle";
-              return (
-                <div key={group.label} className="space-y-2">
-                  <p className="border-b border-border/60 px-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {group.label}
-                  </p>
-                  {isManageGroup ? (
-                    <>
-                      <TabsList className="hidden h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0 sm:flex">
-                        {groupTabs.map(renderTab)}
-                      </TabsList>
-                      <div className="sm:hidden">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="outline" size="sm" className="w-full justify-between">
-                                {groupTabs.find((t) => t.id === activeTab)?.label ??
-                                  `Manage (${groupTabs.length})`}
-                                <ChevronDown className="size-4 opacity-60" />
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent className="w-[var(--anchor-width)]">
-                            {groupTabs.map((t) => (
-                              <DropdownMenuItem
-                                key={t.id}
-                                onClick={() => setTab(t.id)}
-                              >
-                                {t.label}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </>
-                  ) : (
-                    <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
-                      {groupTabs.map(renderTab)}
-                    </TabsList>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-            {tabs.map(renderTab)}
-          </TabsList>
-        )}
+        {renderGroupedTabs()}
         {activeMeta?.description ? (
-          <p className="text-xs text-muted-foreground">{activeMeta.description}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {activeMeta.description}
+          </p>
         ) : null}
         <div className={cn("mt-4", compact && "mt-3")}>
           {children(activeTab)}

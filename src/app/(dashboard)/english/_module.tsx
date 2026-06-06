@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { MetricChart } from "@/components/shared/metric-chart";
+import { ModuleShell } from "@/components/shared/module-shell";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import {
