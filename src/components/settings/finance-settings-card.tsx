@@ -45,6 +45,7 @@ export function FinanceSettingsCard({ enabled }: { enabled: boolean }) {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <form
+            key={String(data?.salaryDay ?? 25)}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();

@@ -33,7 +33,7 @@ export function FormField({
         name={name}
         type={type}
         required={required}
-        defaultValue={defaultValue}
+        defaultValue={defaultValue ?? ""}
         step={step}
         min={min}
         max={max}

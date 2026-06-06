@@ -116,12 +116,7 @@ export default function SettingsPage() {
                                 type="radio"
                                 name="accentColor"
                                 value={color.id}
-                                defaultChecked={
-                                  accentFromSettings(
-                                    data?.theme,
-                                    data?.modulePreferences,
-                                  ) === color.id
-                                }
+                                checked={accent === color.id}
                                 className="sr-only"
                                 onChange={() => setAccent(color.id)}
                               />

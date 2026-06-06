@@ -182,6 +182,7 @@ export function DailyReviewsModule() {
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
+        {open && (
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{edit ? "Edit review" : "Daily review"}</DialogTitle>
@@ -221,11 +222,11 @@ export function DailyReviewsModule() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="moodScore">Mood (1-10)</Label>
-                <Input id="moodScore" name="moodScore" type="number" min={1} max={10} defaultValue={edit?.moodScore} />
+                <Input id="moodScore" name="moodScore" type="number" min={1} max={10} defaultValue={edit?.moodScore ?? ""} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="productivityScore">Productivity (1-10)</Label>
-                <Input id="productivityScore" name="productivityScore" type="number" min={1} max={10} defaultValue={edit?.productivityScore} />
+                <Input id="productivityScore" name="productivityScore" type="number" min={1} max={10} defaultValue={edit?.productivityScore ?? ""} />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -249,6 +250,7 @@ export function DailyReviewsModule() {
             </DialogFooter>
           </form>
         </DialogContent>
+        )}
       </Dialog>
     </ModuleShell>
   );

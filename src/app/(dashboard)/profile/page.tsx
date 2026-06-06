@@ -270,6 +270,7 @@ function IdentityForm({ user, loading }: { user?: User; loading: boolean }) {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <form
+            key={user?.id ?? "identity"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -388,6 +389,7 @@ function AboutForm({ user, loading }: { user?: User; loading: boolean }) {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <form
+            key={user?.id ?? "about"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
