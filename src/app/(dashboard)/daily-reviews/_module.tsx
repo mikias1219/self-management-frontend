@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { Plus, Sun } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ModuleShell } from "@/components/shared/module-shell";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { MetricChart } from "@/components/shared/metric-chart";
 import { StatCard } from "@/components/shared/stat-card";
@@ -25,12 +25,14 @@ import { dailyReviewsApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import type { DailyReview } from "@/lib/types";
 import { filterByDateField } from "@/lib/utils/period";
+import { ModuleShell } from "@/components/shared/module-shell";
 
 export function DailyReviewsModule() {
   const { query, label } = usePeriod("daily-reviews");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<DailyReview | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DailyReview | null>(null);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -95,7 +97,10 @@ export function DailyReviewsModule() {
 
   const remove = useStandMutation((id: string) => dailyReviewsApi.remove(id), {
     invalidateKeys: [["daily-reviews"]],
-    onSuccess: () => toast.success("Review deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Review deleted");
+    },
   });
 
   const columns: DataTableColumn<DailyReview>[] = [
@@ -164,9 +169,16 @@ export function DailyReviewsModule() {
         loading={isLoading}
         getRowId={(r) => r.id}
         onEdit={(row) => { setEdit(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this review?")) remove.mutate(row.id);
-        }}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this review?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -175,6 +187,7 @@ export function DailyReviewsModule() {
             <DialogTitle>{edit ? "Edit review" : "Daily review"}</DialogTitle>
           </DialogHeader>
           <form
+            key={edit?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();

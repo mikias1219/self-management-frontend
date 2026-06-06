@@ -1,11 +1,11 @@
 "use client";
 
-import { Check, Plus, Repeat } from "lucide-react";
+import { Check, ChevronDown, Plus, Repeat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { MetricChart } from "@/components/shared/metric-chart";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
-import { habitsApi } from "@/lib/api";
+import { habitsApi, productivityApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import type { Habit } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const FREQUENCIES = ["daily", "weekly", "monthly"] as const;
 
@@ -31,13 +32,31 @@ export function HabitsModule() {
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editHabit, setEditHabit] = useState<Habit | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Habit | null>(null);
+  const [showAllHabits, setShowAllHabits] = useState(false);
 
   const { data: habits, isLoading } = useStandData(
     ["habits"],
     () => habitsApi.getAll(),
     { enabled: authenticated },
   );
+  const { data: schedule } = useStandData(
+    ["productivity", "schedule", "today"],
+    () => productivityApi.getSchedule({ scope: "today" }),
+    { enabled: authenticated, staleTime: 30_000 },
+  );
+
   const list = habits ?? [];
+
+  const loggedTodayIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of schedule?.items ?? []) {
+      if (item.kind === "habit" && item.status === "done") {
+        ids.add(item.entityId);
+      }
+    }
+    return ids;
+  }, [schedule?.items]);
 
   const stats = useMemo(() => {
     const totalStreak = list.reduce((s, h) => s + h.currentStreak, 0);
@@ -46,12 +65,7 @@ export function HabitsModule() {
     return { totalStreak, best, active };
   }, [list]);
 
-  const chartData = list.map((h) => ({
-    name: h.name.length > 12 ? `${h.name.slice(0, 12)}…` : h.name,
-    value: h.currentStreak,
-  }));
-
-  const invalidate = [["habits"], ["dashboard"], ["analytics"]];
+  const invalidate = [["habits"], ["dashboard"], ["analytics"], ["productivity", "schedule", "today"]];
 
   const save = useStandMutation(
     (p: { id?: string; data: Partial<Habit> & { name?: string } }) =>
@@ -70,7 +84,10 @@ export function HabitsModule() {
 
   const remove = useStandMutation((id: string) => habitsApi.remove(id), {
     invalidateKeys: invalidate,
-    onSuccess: () => toast.success("Habit deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Habit deleted");
+    },
   });
 
   const checkIn = useStandMutation(
@@ -98,9 +115,10 @@ export function HabitsModule() {
           size="sm"
           variant="outline"
           className="h-7"
+          disabled={loggedTodayIds.has(r.id)}
           onClick={() => checkIn.mutate(r.id)}
         >
-          <Check className="size-3.5" /> Done
+          <Check className="size-3.5" /> {loggedTodayIds.has(r.id) ? "Done" : "Log"}
         </Button>
       ),
     },
@@ -132,18 +150,61 @@ export function HabitsModule() {
         <StatCard title="Best streak" value={`${stats.best}d`} loading={isLoading} />
       </div>
 
-      <MetricChart title="Current streaks" data={chartData} type="bar" loading={isLoading} height={220} multiColor color="#3b82f6" />
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Today&apos;s habits</p>
+        {list.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No habits yet — add your first routine.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {list.map((habit) => {
+              const done = loggedTodayIds.has(habit.id);
+              return (
+                <button
+                  key={habit.id}
+                  type="button"
+                  disabled={done || checkIn.isPending}
+                  onClick={() => checkIn.mutate(habit.id)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    done
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                      : "border-border bg-muted/40 text-foreground hover:bg-muted",
+                  )}
+                >
+                  {done && <Check className="size-3.5" />}
+                  <span>{habit.name}</span>
+                  <span className="text-xs text-muted-foreground">{habit.currentStreak}d</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      <DataTable
-        columns={columns}
-        data={list}
-        loading={isLoading}
-        getRowId={(r) => r.id}
-        onEdit={(row) => { setEditHabit(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this habit?")) remove.mutate(row.id);
-        }}
-      />
+      <div className="rounded-xl border">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium"
+          onClick={() => setShowAllHabits((v) => !v)}
+        >
+          All habits ({list.length})
+          <ChevronDown
+            className={cn("size-4 transition-transform", showAllHabits && "rotate-180")}
+          />
+        </button>
+        {showAllHabits && (
+          <div className="border-t px-2 pb-2">
+            <DataTable
+              columns={columns}
+              data={list}
+              loading={isLoading}
+              getRowId={(r) => r.id}
+              onEdit={(row) => { setEditHabit(row); setOpen(true); }}
+              onDelete={(row) => setDeleteTarget(row)}
+            />
+          </div>
+        )}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -151,6 +212,7 @@ export function HabitsModule() {
             <DialogTitle>{editHabit ? "Edit habit" : "New habit"}</DialogTitle>
           </DialogHeader>
           <form
+            key={editHabit?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -197,6 +259,15 @@ export function HabitsModule() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this habit?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </ModuleShell>
   );
 }

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { MetricChart } from "@/components/shared/metric-chart";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ import { healthApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import type { HealthLog } from "@/lib/types";
 import { filterByDateField } from "@/lib/utils/period";
+import { cn } from "@/lib/utils";
 
 const METRICS = [
   "weight",
@@ -35,6 +37,8 @@ const METRICS = [
   "workout",
 ] as const;
 
+type MetricType = (typeof METRICS)[number];
+
 const UNITS: Record<string, string> = {
   weight: "kg",
   exercise: "min",
@@ -44,11 +48,21 @@ const UNITS: Record<string, string> = {
   workout: "min",
 };
 
+const CHART_COLORS: Record<MetricType, string> = {
+  weight: "#f43f5e",
+  exercise: "#3b82f6",
+  sleep: "#8b5cf6",
+  water: "#06b6d4",
+  steps: "#10b981",
+  workout: "#f59e0b",
+};
+
 export function HealthModule() {
   const { query, label } = usePeriod("health");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<HealthLog | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<HealthLog | null>(null);
 
   const { data: all, isLoading } = useStandData(
     ["health"],
@@ -61,8 +75,20 @@ export function HealthModule() {
     [all, query],
   );
 
-  const weightChart = logs
-    .filter((l) => l.metricType === "weight")
+  const defaultMetric = useMemo((): MetricType => {
+    const counts = METRICS.map((m) => ({
+      m,
+      count: logs.filter((l) => l.metricType === m).length,
+    }));
+    counts.sort((a, b) => b.count - a.count);
+    return counts[0]?.count ? counts[0].m : "weight";
+  }, [logs]);
+
+  const [selectedMetric, setSelectedMetric] = useState<MetricType | null>(null);
+  const activeMetric = selectedMetric ?? defaultMetric;
+
+  const chartData = logs
+    .filter((l) => l.metricType === activeMetric)
     .slice(0, 14)
     .reverse()
     .map((l) => ({
@@ -85,7 +111,10 @@ export function HealthModule() {
 
   const remove = useStandMutation((id: string) => healthApi.remove(id), {
     invalidateKeys: [["health"]],
-    onSuccess: () => toast.success("Log deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Log deleted");
+    },
   });
 
   const columns: DataTableColumn<HealthLog>[] = [
@@ -131,8 +160,32 @@ export function HealthModule() {
         <StatCard title="Metric types" value={new Set(logs.map((l) => l.metricType)).size} loading={isLoading} />
       </div>
 
-      {weightChart.length > 0 && (
-        <MetricChart title="Weight trend" data={weightChart} type="line" height={200} color="#f43f5e" />
+      <div className="flex flex-wrap gap-1.5">
+        {METRICS.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setSelectedMetric(m)}
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-xs capitalize transition-colors",
+              activeMetric === m
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-muted/50",
+            )}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {chartData.length > 0 && (
+        <MetricChart
+          title={`${activeMetric} trend`}
+          data={chartData}
+          type={activeMetric === "steps" || activeMetric === "workout" ? "bar" : "line"}
+          height={200}
+          color={CHART_COLORS[activeMetric]}
+        />
       )}
 
       <DataTable
@@ -141,9 +194,7 @@ export function HealthModule() {
         loading={isLoading}
         getRowId={(r) => r.id}
         onEdit={(row) => { setEdit(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this log?")) remove.mutate(row.id);
-        }}
+        onDelete={(row) => setDeleteTarget(row)}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -152,6 +203,7 @@ export function HealthModule() {
             <DialogTitle>{edit ? "Edit log" : "Log health metric"}</DialogTitle>
           </DialogHeader>
           <form
+            key={edit?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -201,6 +253,15 @@ export function HealthModule() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this log?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </ModuleShell>
   );
 }

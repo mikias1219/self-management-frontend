@@ -78,12 +78,17 @@ interface StandUiState {
   moduleSearch: Record<string, string>;
   moduleDialogOpen: Record<string, boolean>;
   pageTab: Record<string, string>;
+  aiChatOpen: boolean;
+  aiChatPrefill?: string;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
   setAuthReady: (ready: boolean) => void;
   setModuleSearch: (key: string, value: string) => void;
   setModuleDialogOpen: (key: string, open: boolean) => void;
   setPageTab: (page: string, tab: string) => void;
+  openAiChat: (prefill?: string) => void;
+  closeAiChat: () => void;
+  setAiChatOpen: (open: boolean) => void;
 }
 
 export const useStandUi = create<StandUiState>((set) => ({
@@ -92,6 +97,8 @@ export const useStandUi = create<StandUiState>((set) => ({
   moduleSearch: {},
   moduleDialogOpen: {},
   pageTab: {},
+  aiChatOpen: false,
+  aiChatPrefill: undefined,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleSidebar: () =>
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -108,6 +115,15 @@ export const useStandUi = create<StandUiState>((set) => ({
     set((s) => ({
       pageTab: { ...s.pageTab, [page]: tab },
     })),
+  openAiChat: (prefill) =>
+    set({ aiChatOpen: true, aiChatPrefill: prefill }),
+  closeAiChat: () => set({ aiChatOpen: false, aiChatPrefill: undefined }),
+  setAiChatOpen: (open) =>
+    set((s) =>
+      open
+        ? { aiChatOpen: true }
+        : { aiChatOpen: false, aiChatPrefill: undefined },
+    ),
 }));
 
 type PeriodSlice = {

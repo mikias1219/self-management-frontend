@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { Bot, MessageCircle } from "lucide-react";
 import { AiChatbot } from "@/components/ai-coach/ai-chatbot";
 import { cn } from "@/lib/utils";
+import { useStandUi } from "@/stores/use-stand";
 
 export function FloatingAiChat() {
-  const [open, setOpen] = useState(false);
+  const open = useStandUi((s) => s.aiChatOpen);
+  const prefill = useStandUi((s) => s.aiChatPrefill);
+  const setAiChatOpen = useStandUi((s) => s.setAiChatOpen);
+  const closeAiChat = useStandUi((s) => s.closeAiChat);
 
   return (
     <>
@@ -16,7 +19,7 @@ export function FloatingAiChat() {
             type="button"
             className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] md:bg-transparent md:backdrop-blur-none"
             aria-label="Close chat overlay"
-            onClick={() => setOpen(false)}
+            onClick={closeAiChat}
           />
           <div
             className={cn(
@@ -26,14 +29,18 @@ export function FloatingAiChat() {
               "animate-in fade-in slide-in-from-bottom-4 duration-200",
             )}
           >
-            <AiChatbot variant="floating" onClose={() => setOpen(false)} />
+            <AiChatbot
+              variant="floating"
+              onClose={closeAiChat}
+              initialInput={prefill}
+            />
           </div>
         </>
       )}
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setAiChatOpen(!open)}
         aria-label={open ? "Close LifeOS assistant" : "Open LifeOS assistant"}
         aria-expanded={open}
         className={cn(

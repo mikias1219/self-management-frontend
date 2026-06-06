@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { Plus, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ModuleShell } from "@/components/shared/module-shell";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function SpiritualModule() {
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<SpiritualActivity | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SpiritualActivity | null>(null);
 
   const { data: all, isLoading } = useStandData(
     ["spiritual"],
@@ -70,7 +71,10 @@ export function SpiritualModule() {
 
   const remove = useStandMutation((id: string) => spiritualApi.remove(id), {
     invalidateKeys: [["spiritual"]],
-    onSuccess: () => toast.success("Deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
   });
 
   const columns: DataTableColumn<SpiritualActivity>[] = [
@@ -124,9 +128,16 @@ export function SpiritualModule() {
         loading={isLoading}
         getRowId={(r) => r.id}
         onEdit={(row) => { setEdit(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete?")) remove.mutate(row.id);
-        }}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this activity?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -135,6 +146,7 @@ export function SpiritualModule() {
             <DialogTitle>{edit ? "Edit activity" : "Log activity"}</DialogTitle>
           </DialogHeader>
           <form
+            key={edit?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();

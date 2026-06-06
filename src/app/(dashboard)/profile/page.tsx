@@ -93,6 +93,20 @@ export default function ProfilePage() {
       </div>
 
       <PasswordForm />
+
+      <p className="text-xs text-muted-foreground">
+        Forgot your current password?{" "}
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => {
+            authApi.logout();
+            window.location.href = "/login";
+          }}
+        >
+          Sign out and use &quot;Forgot password&quot; on the login screen.
+        </button>
+      </p>
     </div>
   );
 }

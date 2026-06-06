@@ -1,12 +1,12 @@
 "use client";
 
 import { format } from "date-fns";
-import { Flag, Plus } from "lucide-react";
+import { ChevronDown, Flag, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { ModuleShell } from "@/components/shared/module-shell";
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { FormField, FormSelect, FormTextarea } from "@/components/shared/form-fields";
 import { ModuleRelations } from "@/components/shared/module-relations";
 import { StatCard } from "@/components/shared/stat-card";
@@ -28,6 +28,7 @@ import { hasAuthToken } from "@/lib/api/client";
 import type { Goal } from "@/lib/types";
 import type { GoalLevel } from "@/lib/types/goal";
 import { filterByDateField } from "@/lib/utils/period";
+import { cn } from "@/lib/utils";
 
 const LEVELS: GoalLevel[] = [
   "vision",
@@ -38,11 +39,22 @@ const LEVELS: GoalLevel[] = [
   "daily",
 ];
 
+const LEVEL_LABELS: Record<GoalLevel, string> = {
+  vision: "Vision",
+  yearly: "Yearly",
+  quarterly: "Quarterly",
+  monthly: "Monthly",
+  weekly: "Weekly",
+  daily: "Daily",
+};
+
 export function GoalsModule() {
   const { query, label } = usePeriod("goals");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Goal | null>(null);
+  const [collapsedLevels, setCollapsedLevels] = useState<Record<string, boolean>>({});
 
   const { links, goals: allGoals, tasks: allTasks } = useGoalsRelations();
   const { data: goalsData, isLoading } = useStandData(
@@ -66,6 +78,15 @@ export function GoalsModule() {
     }
     return m;
   }, [allTasks]);
+
+  const goalsByLevel = useMemo(() => {
+    const grouped = new Map<GoalLevel, Goal[]>();
+    for (const level of LEVELS) grouped.set(level, []);
+    for (const goal of goals) {
+      grouped.get(goal.level)?.push(goal);
+    }
+    return grouped;
+  }, [goals]);
 
   const stats = useMemo(() => {
     const avg =
@@ -98,49 +119,11 @@ export function GoalsModule() {
 
   const remove = useStandMutation((id: string) => goalsApi.remove(id), {
     invalidateKeys: [["goals"], ["tasks"]],
-    onSuccess: () => toast.success("Goal deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Goal deleted");
+    },
   });
-
-  const columns: DataTableColumn<Goal>[] = useMemo(
-    () => [
-      { key: "title", header: "Title", cell: (r) => r.title },
-      { key: "level", header: "Level", cell: (r) => r.level },
-      {
-        key: "tasks",
-        header: "Tasks",
-        cell: (r) => {
-          const n = taskCountByGoal.get(r.id) ?? 0;
-          return n > 0 ? (
-            <Link
-              href="/productivity?tab=tasks"
-              className="text-sky-600 hover:underline"
-            >
-              {n} linked
-            </Link>
-          ) : (
-            "—"
-          );
-        },
-      },
-      {
-        key: "progress",
-        header: "Progress",
-        cell: (r) => (
-          <div className="flex min-w-[120px] items-center gap-2">
-            <Progress value={r.progress} className="flex-1" />
-            <span className="text-xs tabular-nums">{Math.round(r.progress)}%</span>
-          </div>
-        ),
-      },
-      {
-        key: "target",
-        header: "Target",
-        cell: (r) =>
-          r.targetDate ? format(new Date(r.targetDate), "MMM d, yyyy") : "—",
-      },
-    ],
-    [taskCountByGoal],
-  );
 
   if (!authenticated) {
     return (
@@ -169,16 +152,89 @@ export function GoalsModule() {
 
       <ModuleRelations links={links} />
 
-      <DataTable
-        columns={columns}
-        data={goals}
-        loading={isLoading}
-        getRowId={(r) => r.id}
-        onEdit={(row) => { setEditGoal(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this goal?")) remove.mutate(row.id);
-        }}
-      />
+      <div className="space-y-4">
+        {LEVELS.map((level) => {
+          const levelGoals = goalsByLevel.get(level) ?? [];
+          if (levelGoals.length === 0) return null;
+          const collapsed = collapsedLevels[level] ?? false;
+          return (
+            <section key={level} className="rounded-xl border">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium"
+                onClick={() =>
+                  setCollapsedLevels((s) => ({ ...s, [level]: !collapsed }))
+                }
+              >
+                {LEVEL_LABELS[level]} ({levelGoals.length})
+                <ChevronDown
+                  className={cn("size-4 transition-transform", !collapsed && "rotate-180")}
+                />
+              </button>
+              {!collapsed && (
+                <div className="space-y-2 border-t p-3">
+                  {levelGoals.map((goal) => {
+                    const taskCount = taskCountByGoal.get(goal.id) ?? 0;
+                    return (
+                      <div
+                        key={goal.id}
+                        className="rounded-lg border bg-card p-4"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium">{goal.title}</p>
+                            {goal.targetDate && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                Target {format(new Date(goal.targetDate), "MMM d, yyyy")}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setEditGoal(goal); setOpen(true); }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => setDeleteTarget(goal)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                          <Progress value={goal.progress} className="flex-1" />
+                          <span className="text-xs tabular-nums">
+                            {Math.round(goal.progress)}%
+                          </span>
+                        </div>
+                        {taskCount > 0 && (
+                          <Link
+                            href="/productivity?tab=tasks"
+                            className="mt-2 inline-block text-xs text-sky-600 hover:underline"
+                          >
+                            {taskCount} linked task{taskCount === 1 ? "" : "s"}
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+        {!isLoading && goals.length === 0 && (
+          <p className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+            No goals in this period. Add one to start building your hierarchy.
+          </p>
+        )}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -186,6 +242,7 @@ export function GoalsModule() {
             <DialogTitle>{editGoal ? "Edit goal" : "New goal"}</DialogTitle>
           </DialogHeader>
           <form
+            key={editGoal?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -268,6 +325,15 @@ export function GoalsModule() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this goal?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </ModuleShell>
   );
 }

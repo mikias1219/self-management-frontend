@@ -43,6 +43,7 @@ export const PRODUCTIVITY_HUB: HubConfig = {
       label: "Today",
       description:
         "Today's schedule — tasks, calendar events, and your daily score.",
+      primary: true,
     },
     {
       id: "progress",

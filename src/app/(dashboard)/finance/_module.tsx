@@ -32,6 +32,7 @@ import type {
   TxPreset,
   TxPresetValues,
 } from "@/components/finance/finance-dialog";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { colorForModuleKey } from "@/lib/constants/chart-colors";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -95,6 +96,10 @@ export function FinanceModule() {
   const [editing, setEditing] = useState<{ type: DialogMode; id: string } | null>(
     null,
   );
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    label: string;
+    action: () => void;
+  } | null>(null);
 
   const dialogOpen = dialogMode !== null;
   const onOverview = pageTab === "overview";
@@ -189,28 +194,6 @@ export function FinanceModule() {
         taskSuggestsTransaction(task),
     ).length;
     const links: RelationLink[] = [];
-    if (t) {
-      links.push(
-        {
-          label: "Transactions",
-          href: "/life?tab=finance",
-          value: t.transactionCount,
-          color: colorForModuleKey("transactions"),
-        },
-        {
-          label: "Savings rate",
-          href: "/life?tab=finance",
-          value: `${t.savingsRate}%`,
-          color: "#22c55e",
-        },
-        {
-          label: "Budgets tracked",
-          href: "/life?tab=finance",
-          value: s?.budgets.length ?? 0,
-          color: "#f59e0b",
-        },
-      );
-    }
     if (financeGoalCount > 0) {
       links.push({
         label: "Linked goals",
@@ -228,7 +211,7 @@ export function FinanceModule() {
       });
     }
     return links;
-  }, [s?.totals, s?.budgets.length, linkedGoals.data, linkedTasks.data]);
+  }, [linkedGoals.data, linkedTasks.data]);
 
   const savingsDisplay = useMemo(() => {
     const goals = savings.data ?? [];
@@ -605,8 +588,26 @@ export function FinanceModule() {
   };
 
   const confirmDelete = (label: string, fn: () => void) => {
-    if (window.confirm(`Delete this ${label}?`)) fn();
+    setDeleteConfirm({ label, action: fn });
   };
+
+  const salaryLoggedThisCycle =
+    Boolean(s?.currentCycle) && Number(s?.currentCycle?.netSalary ?? 0) > 0;
+  const overdueCount = s?.obligations.overdue.length ?? 0;
+
+  const dailyTabs = [
+    { id: "overview", label: "Overview" },
+    { id: "transactions", label: "Transactions" },
+    { id: "obligations", label: "Obligations", badge: overdueCount },
+  ] as const;
+
+  const manageTabs = [
+    { id: "accounts", label: "Accounts" },
+    { id: "budgets", label: "Budgets" },
+    { id: "savings", label: "Savings" },
+    { id: "categories", label: "Categories" },
+    { id: "cycle", label: "Cycle" },
+  ] as const;
 
   if (!authenticated) {
     return (
@@ -687,26 +688,71 @@ export function FinanceModule() {
       <ModuleRelations links={financeLinks} />
 
       <Tabs value={pageTab} onValueChange={(v) => setPageTab("finance", v)}>
-        <TabsList className="flex h-auto flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="budgets">Budgets</TabsTrigger>
-          <TabsTrigger value="savings">Savings</TabsTrigger>
-          <TabsTrigger value="obligations">
-            Obligations
-            {(s?.obligations.overdue.length ?? 0) > 0 && (
-              <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
-                {s!.obligations.overdue.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="cycle">Cycle</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-        </TabsList>
+        <div className="space-y-2">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            {dailyTabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="text-sm">
+                {tab.label}
+                {"badge" in tab && tab.badge > 0 && (
+                  <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
+                    {tab.badge}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Manage
+            </span>
+            {manageTabs.map((tab) => (
+              <Button
+                key={tab.id}
+                size="xs"
+                variant={pageTab === tab.id ? "secondary" : "ghost"}
+                onClick={() => setPageTab("finance", tab.id)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+        </div>
 
         {pageTab === "overview" && (
         <div className="mt-4 space-y-6">
+          <div className="flex flex-wrap gap-2 rounded-xl border bg-muted/30 p-3">
+            <Button size="sm" variant="outline" onClick={() => openTransaction("expense")}>
+              <Receipt className="size-4" />
+              Log expense
+            </Button>
+            <Button
+              size="sm"
+              variant={salaryLoggedThisCycle ? "outline" : "default"}
+              onClick={() => openTransaction("salary")}
+            >
+              <DollarSign className="size-4" />
+              Log salary
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (overdueCount > 0) {
+                  setPageTab("finance", "obligations");
+                } else {
+                  openTransaction("pay_obligation");
+                }
+              }}
+            >
+              Pay obligation
+              {overdueCount > 0 && (
+                <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
+                  {overdueCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+
           {(!s?.currentCycle || Number(s.currentCycle.netSalary) === 0) && (
             <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 space-y-3">
               <p className="font-medium flex items-center gap-2">
@@ -840,12 +886,6 @@ export function FinanceModule() {
 
           {/* Quick actions */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={() => openTransaction("salary")}>
-              Log salary
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => openTransaction("expense")}>
-              Log expense
-            </Button>
             <Button variant="secondary" size="sm" onClick={() => openTransaction("savings_transfer")}>
               Transfer to savings
             </Button>
@@ -1069,6 +1109,11 @@ export function FinanceModule() {
                 const allocationValid =
                   allocation.fixedObligations + allocation.savingsTarget <=
                   netSalary + 0.001;
+                const pct = (v: number) =>
+                  netSalary > 0 ? Math.round((v / netSalary) * 100) : 0;
+                const obligationsPct = pct(allocation.fixedObligations);
+                const savingsPct = pct(allocation.savingsTarget);
+                const spendingPct = Math.max(0, 100 - obligationsPct - savingsPct);
                 return (
               <div className="rounded-lg border bg-card p-4 space-y-3">
                 <p className="font-medium">Cycle allocation</p>
@@ -1076,6 +1121,32 @@ export function FinanceModule() {
                   Net salary {formatMoney(netSalary, currency)} — set fixed and
                   savings; spending fills the remainder.
                 </p>
+                {netSalary > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex h-3 overflow-hidden rounded-full">
+                      <div
+                        className="bg-rose-500 transition-all"
+                        style={{ width: `${obligationsPct}%` }}
+                        title={`Obligations ${obligationsPct}%`}
+                      />
+                      <div
+                        className="bg-emerald-500 transition-all"
+                        style={{ width: `${savingsPct}%` }}
+                        title={`Savings ${savingsPct}%`}
+                      />
+                      <div
+                        className="bg-sky-500 transition-all"
+                        style={{ width: `${spendingPct}%` }}
+                        title={`Spending ${spendingPct}%`}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span className="text-rose-600">Obligations {obligationsPct}%</span>
+                      <span className="text-emerald-600">Savings {savingsPct}%</span>
+                      <span className="text-sky-600">Spending {spendingPct}%</span>
+                    </div>
+                  </div>
+                )}
                 <form
                   className="grid gap-3 sm:grid-cols-3"
                   onSubmit={(e) => {
@@ -1293,14 +1364,21 @@ export function FinanceModule() {
                   </p>
                   <Progress className="mt-2" value={Math.min(100, pct)} />
                   {g.projectedCompletionDate && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      On track by {g.projectedCompletionDate}
+                    <p
+                      className={`mt-2 text-xs ${
+                        (g.savingsShortfallCarryForward ?? 0) > 0
+                          ? "text-amber-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {(g.savingsShortfallCarryForward ?? 0) > 0
+                        ? `Behind: projected ${format(new Date(g.projectedCompletionDate), "MMM yyyy")}`
+                        : `On track: ${format(new Date(g.projectedCompletionDate), "MMM yyyy")}`}
                     </p>
                   )}
                   {(g.savingsShortfallCarryForward ?? 0) > 0 && (
                     <p className="mt-1 text-xs text-amber-600">
-                      Shortfall carry-forward:{" "}
-                      {formatMoney(g.savingsShortfallCarryForward!, currency)}
+                      {formatMoney(g.savingsShortfallCarryForward!, currency)} short last month
                     </p>
                   )}
                 </div>
@@ -1516,6 +1594,17 @@ export function FinanceModule() {
         onSubmitRecurring={(data) => createRecurring.mutate(data)}
       />
       )}
+
+      <DeleteConfirmDialog
+        open={deleteConfirm !== null}
+        onOpenChange={(o) => !o && setDeleteConfirm(null)}
+        title={`Delete this ${deleteConfirm?.label ?? "item"}?`}
+        description="This cannot be undone."
+        onConfirm={() => {
+          deleteConfirm?.action();
+          setDeleteConfirm(null);
+        }}
+      />
     </ModuleShell>
   );
 }

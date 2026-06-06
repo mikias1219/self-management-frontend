@@ -195,16 +195,16 @@ export function FinanceDialog({
 
         {mode === "transaction" && (
           <form
-            key={`${txPreset}-${presetValues?.pendingObligationId ?? "new"}`}
+            key={`${txPreset}-${presetValues?.pendingObligationId ?? editingId ?? "new"}`}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              const type = fd.get("transactionType") as TransactionType;
+              const type = (fd.get("transactionType") as TransactionType) ?? txType;
               const src = String(
                 fd.get("incomeSource") ?? "",
               ) as FinanceTransaction["incomeSource"];
-              const salary = type === "income" && src === "salary";
+              const salary = type === "income" && (src === "salary" || txPreset === "salary");
               const accountId = optionalUuid(fd.get("accountId"));
               if (!accountId) {
                 toast.error("Select an account first");
@@ -248,15 +248,176 @@ export function FinanceDialog({
                   String(fd.get("description") ?? "").trim() || undefined,
                 categoryId: optionalUuid(fd.get("categoryId")),
                 incomeSource: type === "income" ? src || undefined : undefined,
-                paymentMethod: isExpense
-                  ? (String(
-                      fd.get("paymentMethod") ?? "",
-                    ) as FinanceTransaction["paymentMethod"]) || undefined
-                  : undefined,
+                paymentMethod:
+                  type === "expense"
+                    ? (String(
+                        fd.get("paymentMethod") ?? "",
+                      ) as FinanceTransaction["paymentMethod"]) || undefined
+                    : undefined,
                 savingsGoalId: optionalUuid(fd.get("savingsGoalId")),
               });
             }}
           >
+            <input type="hidden" name="transactionType" value={initialType} />
+            {txPreset === "salary" && !editingId && (
+              <input type="hidden" name="incomeSource" value="salary" />
+            )}
+
+            {txPreset === "expense" && !editingId ? (
+              <>
+                <FormSelect
+                  label="Account"
+                  name="accountId"
+                  required
+                  defaultValue={
+                    presetValues?.accountId ??
+                    checkingAccounts[0]?.id ??
+                    accounts[0]?.id
+                  }
+                  options={accounts.map((a) => ({
+                    value: a.id,
+                    label: `${a.name} (${a.accountType})`,
+                  }))}
+                />
+                <FormField
+                  label="Amount"
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  defaultValue={presetValues?.amount}
+                />
+                <FormSelect
+                  label="Category"
+                  name="categoryId"
+                  defaultValue=""
+                  options={[
+                    { value: "", label: "None" },
+                    ...expenseCats.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    })),
+                  ]}
+                />
+                <FormField
+                  label="Date"
+                  name="transactionDate"
+                  type="date"
+                  required
+                  defaultValue={format(new Date(), "yyyy-MM-dd")}
+                />
+                <FormField
+                  label="Notes"
+                  name="description"
+                  defaultValue={presetValues?.description}
+                />
+              </>
+            ) : txPreset === "salary" && !editingId ? (
+              <>
+                <FormSelect
+                  label="Account"
+                  name="accountId"
+                  required
+                  defaultValue={
+                    checkingAccounts[0]?.id ?? accounts[0]?.id
+                  }
+                  options={accounts.map((a) => ({
+                    value: a.id,
+                    label: `${a.name} (${a.accountType})`,
+                  }))}
+                />
+                <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <FormField
+                    label="Gross"
+                    name="grossAmount"
+                    type="number"
+                    step="0.01"
+                    required
+                    defaultValue={presetValues?.amount}
+                  />
+                  <FormField
+                    label="Tax deducted"
+                    name="taxDeducted"
+                    type="number"
+                    step="0.01"
+                    defaultValue={0}
+                  />
+                  <FormField
+                    label="Pension deducted"
+                    name="pensionDeducted"
+                    type="number"
+                    step="0.01"
+                    defaultValue={0}
+                  />
+                  <FormField
+                    label="Net (take-home)"
+                    name="netAmount"
+                    type="number"
+                    step="0.01"
+                    required
+                    defaultValue={presetValues?.amount}
+                  />
+                </div>
+                <FormField
+                  label="Date"
+                  name="transactionDate"
+                  type="date"
+                  required
+                  defaultValue={format(new Date(), "yyyy-MM-dd")}
+                />
+                <FormField label="Notes" name="description" />
+              </>
+            ) : txPreset === "savings_transfer" && !editingId ? (
+              <>
+                <FormSelect
+                  label="From account"
+                  name="accountId"
+                  required
+                  defaultValue={checkingAccounts[0]?.id ?? accounts[0]?.id}
+                  options={checkingAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.name,
+                  }))}
+                />
+                <FormSelect
+                  label="To savings account"
+                  name="toAccountId"
+                  required
+                  defaultValue={savingsAccounts[0]?.id ?? ""}
+                  options={savingsAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.name,
+                  }))}
+                />
+                <FormField
+                  label="Amount"
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                />
+                <FormSelect
+                  label="Savings goal"
+                  name="savingsGoalId"
+                  required
+                  defaultValue={presetValues?.savingsGoalId ?? ""}
+                  options={[
+                    { value: "", label: "Select goal" },
+                    ...savingsGoals.map((g) => ({ value: g.id, label: g.name })),
+                  ]}
+                />
+                <FormField
+                  label="Date"
+                  name="transactionDate"
+                  type="date"
+                  required
+                  defaultValue={format(new Date(), "yyyy-MM-dd")}
+                />
+              </>
+            ) : (
+              <>
             <FormSelect
               label="From account"
               name="accountId"
@@ -481,6 +642,8 @@ export function FinanceDialog({
                 editTx?.description ?? presetValues?.description
               }
             />
+              </>
+            )}
 
             <DialogFooter>
               <Button type="submit">Save</Button>

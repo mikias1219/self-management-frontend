@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ModuleSearch } from "@/components/layout/module-search";
 import { authApi, notificationsApi } from "@/lib/api";
 import { hasAuthToken } from "@/lib/api/client";
 import { useStandData } from "@/hooks/use-stand-data";
@@ -48,7 +49,11 @@ export function AppHeader({ title }: AppHeaderProps) {
           {title}
         </h1>
       )}
-      <div className="ml-auto" />
+      <div className="flex flex-1 justify-center px-2">
+        <div className="w-full max-w-sm">
+          <ModuleSearch />
+        </div>
+      </div>
       <Button
         variant="ghost"
         size="icon-sm"

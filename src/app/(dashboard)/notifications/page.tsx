@@ -1,12 +1,13 @@
 "use client";
 
 import { format, isWithinInterval, parseISO, startOfDay } from "date-fns";
-import { Bell, Check, ExternalLink } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export default function NotificationsPage() {
   const router = useRouter();
   const { query, label } = usePeriod("notifications");
   const authenticated = hasAuthToken();
+  const [deleteTarget, setDeleteTarget] = useState<Notification | null>(null);
 
   const { data: all, isLoading } = useStandData(
     ["notifications"],
@@ -52,11 +54,32 @@ export default function NotificationsPage() {
     },
   );
 
+  const markAllRead = useStandMutation(
+    async () => {
+      const unreadItems = (all ?? []).filter((n) => !n.isRead);
+      await Promise.all(
+        unreadItems.map((n) =>
+          notificationsApi.update(n.id, {
+            isRead: true,
+            readAt: new Date().toISOString(),
+          }),
+        ),
+      );
+    },
+    {
+      invalidateKeys: [["notifications"], ["notifications", "unread-count"], ["dashboard"]],
+      onSuccess: () => toast.success("All notifications marked as read"),
+    },
+  );
+
   const remove = useStandMutation(
     (id: string) => notificationsApi.remove(id),
     {
       invalidateKeys: [["notifications"], ["notifications", "unread-count"]],
-      onSuccess: () => toast.success("Deleted"),
+      onSuccess: () => {
+        setDeleteTarget(null);
+        toast.success("Deleted");
+      },
     },
   );
 
@@ -143,20 +166,50 @@ export default function NotificationsPage() {
       description={`System alerts from LifeOS — ${label}`}
       icon={Bell}
       iconClassName="bg-slate-500/15 text-slate-600"
+      actions={
+        unread > 0 ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={markAllRead.isPending}
+            onClick={() => markAllRead.mutate()}
+          >
+            <CheckCheck className="size-4" />
+            Mark all as read
+          </Button>
+        ) : undefined
+      }
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <StatCard title="Total" value={notifications.length} loading={isLoading} />
         <StatCard title="Unread" value={unread} loading={isLoading} />
       </div>
 
-      <DataTable
-        columns={columns}
-        data={notifications}
-        loading={isLoading}
-        getRowId={(r) => r.id}
-        onDelete={(r) => {
-          if (window.confirm("Delete this notification?")) remove.mutate(r.id);
-        }}
+      {!isLoading && notifications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-14 text-center">
+          <Bell className="mb-3 size-10 text-muted-foreground/40" />
+          <p className="text-sm font-medium">No notifications</p>
+          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+            LifeOS generates alerts here when something needs your attention — overdue tasks, budget warnings, and more.
+          </p>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={notifications}
+          loading={isLoading}
+          getRowId={(r) => r.id}
+          onDelete={(r) => setDeleteTarget(r)}
+        />
+      )}
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this notification?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
       />
     </ModuleShell>
   );

@@ -1,11 +1,11 @@
 "use client";
 
 import { format } from "date-fns";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ModuleShell } from "@/components/shared/module-shell";
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,11 +33,19 @@ const ENTRY_TYPES: JournalEntryType[] = [
   "freeform",
 ];
 
+function previewContent(content: string, max = 150) {
+  const trimmed = content.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max).trim()}…`;
+}
+
 export function JournalModule() {
   const { query, label } = usePeriod("journal");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<JournalEntry | null>(null);
+  const [readEntry, setReadEntry] = useState<JournalEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<JournalEntry | null>(null);
 
   const { data: all, isLoading } = useStandData(
     ["journal"],
@@ -74,26 +82,11 @@ export function JournalModule() {
 
   const remove = useStandMutation((id: string) => journalApi.remove(id), {
     invalidateKeys: [["journal"]],
-    onSuccess: () => toast.success("Entry deleted"),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Entry deleted");
+    },
   });
-
-  const columns: DataTableColumn<JournalEntry>[] = [
-    { key: "title", header: "Title", cell: (r) => r.title },
-    {
-      key: "type",
-      header: "Type",
-      cell: (r) => (
-        <Badge variant="outline" className="capitalize">
-          {r.entryType}
-        </Badge>
-      ),
-    },
-    {
-      key: "date",
-      header: "Date",
-      cell: (r) => format(new Date(r.entryDate), "MMM d, yyyy"),
-    },
-  ];
 
   if (!authenticated) {
     return (
@@ -120,16 +113,95 @@ export function JournalModule() {
         <StatCard title="Words written" value={stats.words} loading={isLoading} />
       </div>
 
-      <DataTable
-        columns={columns}
-        data={entries}
-        loading={isLoading}
-        getRowId={(r) => r.id}
-        onEdit={(row) => { setEdit(row); setOpen(true); }}
-        onDelete={(row) => {
-          if (window.confirm("Delete this entry?")) remove.mutate(row.id);
-        }}
-      />
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading entries…</p>
+      ) : entries.length === 0 ? (
+        <p className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+          No entries yet. Start writing your first journal entry.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {entries.map((entry) => (
+            <article
+              key={entry.id}
+              className="group rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => setReadEntry(entry)}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">{entry.title}</h3>
+                    <Badge variant="outline" className="capitalize text-[10px]">
+                      {entry.entryType}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(entry.entryDate), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {previewContent(entry.content ?? "")}
+                  </p>
+                </button>
+                <div className="flex shrink-0 gap-1 opacity-70 group-hover:opacity-100">
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Edit entry"
+                    onClick={() => { setEdit(entry); setOpen(true); }}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    aria-label="Delete entry"
+                    onClick={() => setDeleteTarget(entry)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={readEntry !== null} onOpenChange={(o) => !o && setReadEntry(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{readEntry?.title}</DialogTitle>
+          </DialogHeader>
+          {readEntry && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline" className="capitalize">
+                  {readEntry.entryType}
+                </Badge>
+                <span>{format(new Date(readEntry.entryDate), "MMMM d, yyyy")}</span>
+              </div>
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                {readEntry.content}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEdit(readEntry);
+                    setReadEntry(null);
+                    setOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
@@ -137,6 +209,7 @@ export function JournalModule() {
             <DialogTitle>{edit ? "Edit entry" : "New journal entry"}</DialogTitle>
           </DialogHeader>
           <form
+            key={edit?.id ?? "new"}
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -184,6 +257,15 @@ export function JournalModule() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete this entry?"
+        description="This cannot be undone."
+        loading={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </ModuleShell>
   );
 }

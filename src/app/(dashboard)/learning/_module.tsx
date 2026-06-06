@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { BookOpen, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { StatCard } from "@/components/shared/stat-card";
@@ -33,6 +34,16 @@ import { useStandUi } from "@/stores/use-stand";
 
 const STATUSES = ["not_started", "in_progress", "completed", "paused"] as const;
 
+type LearningDeleteKind = "book" | "course" | "skill" | "project" | "session";
+
+const DELETE_LABELS: Record<LearningDeleteKind, string> = {
+  book: "book",
+  course: "course",
+  skill: "skill",
+  project: "project",
+  session: "study session",
+};
+
 export function LearningModule() {
   const { query, label } = usePeriod("learning");
   const authenticated = hasAuthToken();
@@ -40,6 +51,10 @@ export function LearningModule() {
   const setPageTab = useStandUi((s) => s.setPageTab);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    kind: LearningDeleteKind;
+    id: string;
+  } | null>(null);
 
   const onBooks = pageTab === "books";
   const onCourses = pageTab === "courses";
@@ -79,11 +94,69 @@ export function LearningModule() {
     ["dashboard"],
   ];
 
-  const removeBook = useStandMutation((id: string) => learningApi.books.remove(id), { invalidateKeys: invalidate, onSuccess: () => toast.success("Deleted") });
-  const removeCourse = useStandMutation((id: string) => learningApi.courses.remove(id), { invalidateKeys: invalidate, onSuccess: () => toast.success("Deleted") });
-  const removeSkill = useStandMutation((id: string) => learningApi.skills.remove(id), { invalidateKeys: invalidate, onSuccess: () => toast.success("Deleted") });
-  const removeProject = useStandMutation((id: string) => learningApi.projects.remove(id), { invalidateKeys: invalidate, onSuccess: () => toast.success("Deleted") });
-  const removeSession = useStandMutation((id: string) => learningApi.studySessions.remove(id), { invalidateKeys: invalidate, onSuccess: () => toast.success("Deleted") });
+  const removeBook = useStandMutation((id: string) => learningApi.books.remove(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
+  });
+  const removeCourse = useStandMutation((id: string) => learningApi.courses.remove(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
+  });
+  const removeSkill = useStandMutation((id: string) => learningApi.skills.remove(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
+  });
+  const removeProject = useStandMutation((id: string) => learningApi.projects.remove(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
+  });
+  const removeSession = useStandMutation((id: string) => learningApi.studySessions.remove(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => {
+      setDeleteTarget(null);
+      toast.success("Deleted");
+    },
+  });
+
+  const deleteLoading =
+    removeBook.isPending ||
+    removeCourse.isPending ||
+    removeSkill.isPending ||
+    removeProject.isPending ||
+    removeSession.isPending;
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    switch (deleteTarget.kind) {
+      case "book":
+        removeBook.mutate(deleteTarget.id);
+        break;
+      case "course":
+        removeCourse.mutate(deleteTarget.id);
+        break;
+      case "skill":
+        removeSkill.mutate(deleteTarget.id);
+        break;
+      case "project":
+        removeProject.mutate(deleteTarget.id);
+        break;
+      case "session":
+        removeSession.mutate(deleteTarget.id);
+        break;
+    }
+  };
 
   const bookCols: DataTableColumn<Book>[] = [
     { key: "title", header: "Title", cell: (r) => r.title },
@@ -150,27 +223,27 @@ export function LearningModule() {
         <TabsContent value="books" className="mt-4">
           <DataTable columns={bookCols} data={books.data ?? []} loading={books.isLoading} getRowId={(r) => r.id}
             onEdit={(r) => { setEditId(r.id); setOpen(true); }}
-            onDelete={(r) => { if (window.confirm("Delete?")) removeBook.mutate(r.id); }} />
+            onDelete={(r) => setDeleteTarget({ kind: "book", id: r.id })} />
         </TabsContent>
         <TabsContent value="courses" className="mt-4">
           <DataTable columns={courseCols} data={courses.data ?? []} loading={courses.isLoading} getRowId={(r) => r.id}
             onEdit={(r) => { setEditId(r.id); setOpen(true); }}
-            onDelete={(r) => { if (window.confirm("Delete?")) removeCourse.mutate(r.id); }} />
+            onDelete={(r) => setDeleteTarget({ kind: "course", id: r.id })} />
         </TabsContent>
         <TabsContent value="skills" className="mt-4">
           <DataTable columns={skillCols} data={skills.data ?? []} loading={skills.isLoading} getRowId={(r) => r.id}
             onEdit={(r) => { setEditId(r.id); setOpen(true); }}
-            onDelete={(r) => { if (window.confirm("Delete?")) removeSkill.mutate(r.id); }} />
+            onDelete={(r) => setDeleteTarget({ kind: "skill", id: r.id })} />
         </TabsContent>
         <TabsContent value="projects" className="mt-4">
           <DataTable columns={projectCols} data={projects.data ?? []} loading={projects.isLoading} getRowId={(r) => r.id}
             onEdit={(r) => { setEditId(r.id); setOpen(true); }}
-            onDelete={(r) => { if (window.confirm("Delete?")) removeProject.mutate(r.id); }} />
+            onDelete={(r) => setDeleteTarget({ kind: "project", id: r.id })} />
         </TabsContent>
         <TabsContent value="sessions" className="mt-4">
           <DataTable columns={sessionCols} data={filteredSessions} loading={sessions.isLoading} getRowId={(r) => r.id}
             onEdit={(r) => { setEditId(r.id); setOpen(true); }}
-            onDelete={(r) => { if (window.confirm("Delete?")) removeSession.mutate(r.id); }} />
+            onDelete={(r) => setDeleteTarget({ kind: "session", id: r.id })} />
         </TabsContent>
       </Tabs>
 
@@ -186,6 +259,19 @@ export function LearningModule() {
         sessions={sessions.data ?? []}
         invalidateKeys={invalidate}
         onDone={() => { setOpen(false); setEditId(null); }}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title={
+          deleteTarget
+            ? `Delete this ${DELETE_LABELS[deleteTarget.kind]}?`
+            : "Delete this item?"
+        }
+        description="This cannot be undone."
+        loading={deleteLoading}
+        onConfirm={confirmDelete}
       />
     </ModuleShell>
   );
@@ -242,7 +328,7 @@ function LearningDialog({
         </DialogHeader>
 
         {tab === "books" && (
-          <form className="space-y-4" onSubmit={(e) => {
+          <form key={editId ?? "new-book"} className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const data = {
@@ -268,7 +354,7 @@ function LearningDialog({
         )}
 
         {tab === "courses" && (
-          <form className="space-y-4" onSubmit={(e) => {
+          <form key={editId ?? "new-course"} className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const data = {
@@ -294,7 +380,7 @@ function LearningDialog({
         )}
 
         {tab === "skills" && (
-          <form className="space-y-4" onSubmit={(e) => {
+          <form key={editId ?? "new-skill"} className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const data = {
@@ -314,7 +400,7 @@ function LearningDialog({
         )}
 
         {tab === "projects" && (
-          <form className="space-y-4" onSubmit={(e) => {
+          <form key={editId ?? "new-project"} className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const data = {
@@ -336,7 +422,7 @@ function LearningDialog({
         )}
 
         {tab === "sessions" && (
-          <form className="space-y-4" onSubmit={(e) => {
+          <form key={editId ?? "new-session"} className="space-y-4" onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const data = {

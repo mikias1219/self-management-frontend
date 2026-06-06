@@ -34,13 +34,14 @@ function formatTime(iso: string) {
 type AiChatbotProps = {
   variant?: "floating" | "full";
   onClose?: () => void;
+  initialInput?: string;
 };
 
-export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
+export function AiChatbot({ variant = "full", onClose, initialInput }: AiChatbotProps) {
   const isFloating = variant === "floating";
   const [messages, setMessages] = useState<AiCoachMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput ?? "");
   const [loading, setLoading] = useState(false);
   const [pendingActions, setPendingActions] = useState<AiProposedAction[]>([]);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -61,6 +62,10 @@ export function AiChatbot({ variant = "full", onClose }: AiChatbotProps) {
       textareaRef.current?.focus();
     }
   }, [isFloating]);
+
+  useEffect(() => {
+    if (initialInput) setInput(initialInput);
+  }, [initialInput]);
 
   const send = useCallback(
     async (text: string) => {

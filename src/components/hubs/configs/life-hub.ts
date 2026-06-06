@@ -1,4 +1,9 @@
-import { HeartHandshake } from "lucide-react";
+import {
+  BookOpen,
+  Heart,
+  HeartHandshake,
+  Wallet,
+} from "lucide-react";
 import { loadPanel } from "@/components/hubs/configs/panel-loader";
 import type { HubConfig } from "@/components/hubs/configs/types";
 
@@ -25,26 +30,35 @@ export const LIFE_HUB: HubConfig = {
     "Finance, health, spiritual practice, and journaling — the personal side of your stand.",
   icon: HeartHandshake,
   iconClassName: "bg-rose-500/15 text-rose-600",
+  tabGroups: [
+    { label: "Primary", tabIds: ["finance"] },
+    { label: "Lifestyle", tabIds: ["health", "spiritual", "journal"] },
+  ],
   tabs: [
     {
       id: "finance",
       label: "Finance",
       description: "Accounts, budgets, transactions, and savings.",
+      icon: Wallet,
+      primary: true,
     },
     {
       id: "health",
       label: "Health",
       description: "Workouts, metrics, and wellness tracking.",
+      icon: Heart,
     },
     {
       id: "spiritual",
       label: "Spiritual",
       description: "Prayer, scripture, and faith practices.",
+      icon: BookOpen,
     },
     {
       id: "journal",
       label: "Journal",
       description: "Daily entries and reflections.",
+      icon: BookOpen,
     },
   ],
   defaultTab: "finance",

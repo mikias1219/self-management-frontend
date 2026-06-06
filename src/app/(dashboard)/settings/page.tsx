@@ -39,7 +39,7 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-8">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Settings</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -62,81 +62,101 @@ export default function SettingsPage() {
       )}
 
       {authenticated === true && (
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-          <FinanceSettingsCard enabled={authenticated} />
-          <Card className="border shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Appearance</CardTitle>
-              <CardDescription>Accent color used across LifeOS.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading…</p>
-              ) : (
-                <form
-                  className="space-y-5"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const accentColor = fd.get("accentColor") as AccentColorId;
-                    setAccent(accentColor);
-                    void mutation.mutate({
-                      timezone: data?.timezone ?? "UTC",
-                      locale: data?.locale ?? "en",
-                      theme: data?.theme ?? "light",
-                      modulePreferences: {
-                        ...(data?.modulePreferences ?? {}),
-                        accentColor,
-                      },
-                    });
-                  }}
-                >
-                  <fieldset className="space-y-2">
-                    <legend className="text-sm font-medium">Accent color</legend>
-                    <div className="flex flex-wrap gap-2">
-                      {ACCENT_COLORS.map((color) => (
-                        <label
-                          key={color.id}
-                          className={cn(
-                            "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
-                            accent === color.id
-                              ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                              : "border-border hover:bg-muted/50",
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="accentColor"
-                            value={color.id}
-                            defaultChecked={
-                              accentFromSettings(
-                                data?.theme,
-                                data?.modulePreferences,
-                              ) === color.id
-                            }
-                            className="sr-only"
-                            onChange={() => setAccent(color.id)}
-                          />
-                          <span
-                            className="size-4 rounded-full border border-black/10"
-                            style={{ background: color.swatch }}
-                          />
-                          {color.label}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
+        <>
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight">Preferences</h3>
+              <p className="text-xs text-muted-foreground">
+                How LifeOS looks and handles your finances.
+              </p>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+              <FinanceSettingsCard enabled={authenticated} />
+              <Card className="border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Appearance</CardTitle>
+                  <CardDescription>Accent color used across LifeOS.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  ) : (
+                    <form
+                      className="space-y-5"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        const accentColor = fd.get("accentColor") as AccentColorId;
+                        setAccent(accentColor);
+                        void mutation.mutate({
+                          timezone: data?.timezone ?? "UTC",
+                          locale: data?.locale ?? "en",
+                          theme: data?.theme ?? "light",
+                          modulePreferences: {
+                            ...(data?.modulePreferences ?? {}),
+                            accentColor,
+                          },
+                        });
+                      }}
+                    >
+                      <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">Accent color</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {ACCENT_COLORS.map((color) => (
+                            <label
+                              key={color.id}
+                              className={cn(
+                                "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                                accent === color.id
+                                  ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                                  : "border-border hover:bg-muted/50",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name="accentColor"
+                                value={color.id}
+                                defaultChecked={
+                                  accentFromSettings(
+                                    data?.theme,
+                                    data?.modulePreferences,
+                                  ) === color.id
+                                }
+                                className="sr-only"
+                                onChange={() => setAccent(color.id)}
+                              />
+                              <span
+                                className="size-4 rounded-full border border-black/10"
+                                style={{ background: color.swatch }}
+                              />
+                              {color.label}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
 
-                  <Button type="submit" disabled={mutation.isPending}>
-                    {mutation.isPending ? "Saving…" : "Save preferences"}
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+                      <Button type="submit" disabled={mutation.isPending}>
+                        {mutation.isPending ? "Saving…" : "Save preferences"}
+                      </Button>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
 
-          <GoogleCalendarSettings />
-        </div>
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight">Integrations</h3>
+              <p className="text-xs text-muted-foreground">
+                Connect external services to LifeOS.
+              </p>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+              <GoogleCalendarSettings />
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

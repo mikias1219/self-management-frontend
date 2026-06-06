@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
+  Bot,
   CheckSquare,
   Clock,
   Flame,
+  GraduationCap,
   Sparkles,
   Target,
   TrendingUp,
@@ -14,14 +16,15 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HubOverview } from "@/components/dashboard/hub-overview";
-import { authApi, dashboardApi, financeApi, productivityApi } from "@/lib/api";
+import { authApi, activityLogsApi, dashboardApi, financeApi, productivityApi } from "@/lib/api";
 import { useHasAuthToken } from "@/hooks/use-has-auth-token";
 import { useStandData } from "@/hooks/use-stand-data";
 import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
+import { useStandUi } from "@/stores/use-stand";
 
 function savingsRateColor(rate: number) {
   if (rate > 15) return "text-emerald-600";
@@ -44,10 +47,28 @@ function formatMinutes(m: number) {
   return `${r}m`;
 }
 
+function insightActionLink(insight: string): { href: string; label: string } | null {
+  const lower = insight.toLowerCase();
+  if (lower.includes("overdue task")) {
+    return { href: "/productivity?tab=tasks", label: "Go to tasks" };
+  }
+  if (
+    lower.includes("finance") ||
+    lower.includes("budget") ||
+    lower.includes("expense") ||
+    lower.includes("salary") ||
+    lower.includes("obligation")
+  ) {
+    return { href: "/life?tab=finance", label: "Go to finance" };
+  }
+  return null;
+}
+
 /** Personal OS dashboard — progressive sections, no full-page blocking. */
 export function DashboardOverview() {
   const authenticated = useHasAuthToken();
   const authReady = authenticated === true;
+  const openAiChat = useStandUi((s) => s.openAiChat);
 
   const { data, isLoading: overviewLoading } = useStandData(
     ["dashboard", "pos"],
@@ -70,6 +91,12 @@ export function DashboardOverview() {
     { enabled: authReady, staleTime: 30_000 },
   );
 
+  const { data: recentActivity } = useStandData(
+    ["activity-logs", "dashboard-recent"],
+    () => activityLogsApi.getByPeriod({ period: "week" }),
+    { enabled: authReady, staleTime: 60_000 },
+  );
+
   if (authenticated === null) {
     return (
       <div className="space-y-6">
@@ -77,8 +104,8 @@ export function DashboardOverview() {
           <Skeleton className="h-8 w-56" />
           <Skeleton className="h-4 w-72" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
             <Card key={i} className="border shadow-sm">
               <CardContent className="h-24" />
             </Card>
@@ -112,29 +139,21 @@ export function DashboardOverview() {
           progress: success?.successScore ?? 0,
         },
         {
-          label: "Tasks done",
-          value: `${success?.tasksCompleted ?? 0}/${success?.tasksPlanned ?? 0}`,
-          icon: CheckSquare,
-          tint: "text-sky-600",
-        },
-        {
-          label: "Focused time",
-          value: formatMinutes(success?.minutesAchieved ?? 0),
-          sub: `of ${formatMinutes(success?.minutesPlanned ?? 0)} planned`,
-          icon: Clock,
-          tint: "text-amber-600",
-        },
-        {
-          label: "Net balance",
-          value: formatMoney(data.financialSnapshot.netBalance, currency),
+          label: "Savings rate",
+          value: formatPercent(data.financialSnapshot.savingsRate),
           icon: Wallet,
-          tint:
-            data.financialSnapshot.netBalance >= 0
-              ? "text-emerald-600"
-              : "text-rose-600",
+          tint: savingsRateColor(data.financialSnapshot.savingsRate),
+        },
+        {
+          label: "Studied today",
+          value: formatMinutes(data.todayFocus.studyMinutes),
+          icon: GraduationCap,
+          tint: "text-emerald-600",
         },
       ]
     : null;
+
+  const insightLink = data ? insightActionLink(data.aiInsight) : null;
 
   return (
     <div className="space-y-6">
@@ -156,14 +175,39 @@ export function DashboardOverview() {
         </Card>
       ) : data ? (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-          <CardContent className="flex items-start gap-2.5 py-4">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
-            <p className="text-sm leading-relaxed">{data.aiInsight}</p>
+          <CardContent className="flex items-start justify-between gap-3 py-4">
+            <div className="flex min-w-0 flex-1 items-start gap-2.5">
+              <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm leading-relaxed">{data.aiInsight}</p>
+                {insightLink && (
+                  <Link
+                    href={insightLink.href}
+                    className="inline-flex items-center gap-0.5 text-xs text-primary"
+                  >
+                    {insightLink.label} <ArrowRight className="size-3" />
+                  </Link>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="xs"
+              className="shrink-0"
+              onClick={() =>
+                openAiChat(
+                  `Based on this insight, help me take action: "${data.aiInsight}"`,
+                )
+              }
+            >
+              <Bot className="size-3.5" />
+              Ask AI Coach
+            </Button>
           </CardContent>
         </Card>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {kpis
           ? kpis.map((k) => {
               const Icon = k.icon;
@@ -176,10 +220,9 @@ export function DashboardOverview() {
                       </p>
                       <Icon className={cn("size-4", k.tint)} />
                     </div>
-                    <p className="text-xl font-semibold tabular-nums">{k.value}</p>
-                    {k.sub && (
-                      <p className="text-xs text-muted-foreground">{k.sub}</p>
-                    )}
+                    <p className={cn("text-xl font-semibold tabular-nums", k.tint)}>
+                      {k.value}
+                    </p>
                     {k.progress !== undefined && (
                       <Progress value={k.progress} className="h-1.5" />
                     )}
@@ -187,7 +230,7 @@ export function DashboardOverview() {
                 </Card>
               );
             })
-          : [1, 2, 3, 4].map((i) => (
+          : [1, 2, 3].map((i) => (
               <Card key={i} className="animate-pulse border shadow-sm">
                 <CardContent className="h-24" />
               </Card>
@@ -368,10 +411,45 @@ export function DashboardOverview() {
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-medium text-muted-foreground">
-          Jump into a life area
-        </p>
-        <HubOverview />
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-medium text-muted-foreground">
+            Recent activity
+          </p>
+          <Link
+            href="/insights?tab=activity"
+            className="inline-flex items-center gap-0.5 text-xs text-primary"
+          >
+            View all <ArrowRight className="size-3" />
+          </Link>
+        </div>
+        <Card className="border shadow-sm">
+          <CardContent className="py-3">
+            {(recentActivity ?? []).length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                No recent activity yet.
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {(recentActivity ?? []).slice(0, 3).map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center justify-between gap-2 py-2.5 text-sm"
+                  >
+                    <span className="truncate">
+                      {entry.description ??
+                        `${entry.action} ${entry.entityType}`}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(entry.createdAt), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

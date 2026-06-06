@@ -18,6 +18,8 @@ export interface NavItem {
   group?: string;
   color: string;
   description?: string;
+  /** Permanent subtle accent in sidebar (e.g. AI Coach). */
+  highlight?: boolean;
 }
 
 export const NAV_GROUP_COLORS: Record<string, string> = {
@@ -43,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Overview",
     color: "bg-indigo-500/15 text-indigo-600",
     description: "Chat with your Personal OS assistant",
+    highlight: true,
   },
   {
     title: "Productivity",
