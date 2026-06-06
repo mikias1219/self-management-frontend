@@ -108,13 +108,6 @@ export const NAV_GROUPS = ["Overview", "Life areas", "System"] as const;
 /** Deep links for header search (hub + tab). */
 export const NAV_SEARCH_EXTRAS: NavItem[] = [
   {
-    title: "AI Coach",
-    href: "/ai-coach",
-    icon: Bot,
-    group: "Overview",
-    color: "bg-indigo-500/15 text-indigo-600",
-  },
-  {
     title: "Today",
     href: "/productivity?tab=today",
     icon: ListChecks,
@@ -214,4 +207,9 @@ export const NAV_SEARCH_EXTRAS: NavItem[] = [
   },
 ];
 
-export const ALL_SEARCH_NAV = [...NAV_ITEMS, ...NAV_SEARCH_EXTRAS];
+export const ALL_SEARCH_NAV = [
+  ...NAV_ITEMS,
+  ...NAV_SEARCH_EXTRAS.filter(
+    (extra) => !NAV_ITEMS.some((item) => item.href === extra.href),
+  ),
+];

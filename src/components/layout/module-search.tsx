@@ -64,7 +64,7 @@ export function ModuleSearch() {
         ) : (
           <ul className="max-h-56 overflow-y-auto">
             {results.map((item) => (
-              <li key={item.href}>
+              <li key={`${item.href}-${item.title}`}>
                 <button
                   type="button"
                   className={cn(
