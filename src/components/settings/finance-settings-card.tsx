@@ -55,7 +55,11 @@ export function FinanceSettingsCard({ enabled }: { enabled: boolean }) {
                 toast.error("Salary day must be between 1 and 31");
                 return;
               }
-              void mutation.mutate({ salaryDay });
+              void mutation.mutate({
+                salaryDay,
+                annualSavingsTarget:
+                  Number(fd.get("annualSavingsTarget")) || undefined,
+              });
             }}
           >
             <div className="space-y-1.5">
@@ -75,6 +79,21 @@ export function FinanceSettingsCard({ enabled }: { enabled: boolean }) {
               <p className="text-xs text-muted-foreground">
                 Example: if you are paid on the 25th, set 25. Logging salary
                 income opens a new cycle automatically.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="annualSavingsTarget">Annual savings target</Label>
+              <Input
+                id="annualSavingsTarget"
+                name="annualSavingsTarget"
+                type="number"
+                step="0.01"
+                min={0}
+                placeholder="60000"
+                defaultValue={data?.annualSavingsTarget ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total amount you want to save this calendar year.
               </p>
             </div>
             <Button type="submit" disabled={mutation.isPending}>

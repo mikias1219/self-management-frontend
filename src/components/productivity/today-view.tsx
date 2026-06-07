@@ -152,7 +152,14 @@ export function TodayView() {
       invalidateKeys: INVALIDATE,
       invalidateAll: false,
       onSuccess: async () => {
-        toast.success("Done");
+        toast.success("Done", {
+          action: {
+            label: "Report time",
+            onClick: () => {
+              window.location.href = "/productivity?tab=tasks";
+            },
+          },
+        });
         await refetch();
       },
     },

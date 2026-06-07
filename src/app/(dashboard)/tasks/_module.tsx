@@ -5,6 +5,10 @@ import { CheckCircle2, CheckSquare, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { TaskPastView } from "@/components/tasks/task-past-view";
+import { TaskPresentView } from "@/components/tasks/task-present-view";
+import { TaskFutureView } from "@/components/tasks/task-future-view";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { ModuleShell } from "@/components/shared/module-shell";
 import { useHubEmbedded } from "@/components/hubs/hub-context";
@@ -35,18 +39,16 @@ import { hasAuthToken } from "@/lib/api/client";
 import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@/lib/types/task";
 import { filterByDateField } from "@/lib/utils/period";
+import {
+  formatMinutes,
+  minutesToTimeInput,
+  parseTimeInput,
+} from "@/lib/utils/time-input";
 import Link from "next/link";
 
-const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "cancelled"];
+const STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked", "done", "cancelled"];
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
-
-function formatMinutes(m: number) {
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (h > 0 && r > 0) return `${h}h ${r}m`;
-  if (h > 0) return `${h}h`;
-  return r > 0 ? `${r}m` : "—";
-}
+const RECURRING_INTERVALS = ["none", "weekly", "monthly", "yearly"] as const;
 
 export function TasksModule() {
   const embedded = useHubEmbedded();
@@ -57,7 +59,10 @@ export function TasksModule() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [reportTask, setReportTask] = useState<Task | null>(null);
   const [reportMinutes, setReportMinutes] = useState("");
+  const [reportNote, setReportNote] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [ppfTab, setPpfTab] = useState<"present" | "past" | "future" | "all">("present");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: allTasks, isLoading } = useStandData(
     ["tasks"],
@@ -70,13 +75,25 @@ export function TasksModule() {
     { enabled: authenticated },
   );
 
-  const tasks = useMemo(
-    () =>
-      filterByDateField(allTasks ?? [], query, (t) =>
-        t.dueDate ?? t.createdAt?.slice(0, 10),
-      ),
-    [allTasks, query],
-  );
+  const tasks = useMemo(() => {
+    const filtered = filterByDateField(allTasks ?? [], query, (t) =>
+      t.dueDate ?? t.createdAt?.slice(0, 10),
+    );
+    const order = { overdue: 0, today: 1, week: 2, future: 3 } as const;
+    const rank = (t: Task) => {
+      const now = new Date();
+      if (
+        t.dueDate &&
+        new Date(t.dueDate) < now &&
+        t.taskStatus !== "done" &&
+        t.taskStatus !== "cancelled"
+      )
+        return order.overdue;
+      if (t.taskStatus === "in_progress") return order.today;
+      return order.future;
+    };
+    return [...filtered].sort((a, b) => rank(a) - rank(b));
+  }, [allTasks, query]);
 
   const { data: taskIntel } = useStandData(
     ["analytics", "task-intelligence"],
@@ -180,21 +197,55 @@ export function TasksModule() {
   });
 
   const report = useStandMutation(
-    (p: { id: string; timeSpentMinutes: number; hintTask?: Task }) =>
-      tasksApi.report(p.id, { timeSpentMinutes: p.timeSpentMinutes }),
+    (p: {
+      id: string;
+      timeSpentMinutes: number;
+      completionNote?: string;
+      hintTask?: Task;
+    }) =>
+      tasksApi.report(p.id, {
+        timeSpentMinutes: p.timeSpentMinutes,
+        completionNote: p.completionNote,
+      }),
     {
       invalidateKeys: invalidate,
       onSuccess: (_, vars) => {
         setReportTask(null);
+        setReportNote("");
         toast.success("Achievement reported — visible on dashboard");
         if (vars.hintTask && taskSuggestsTransaction(vars.hintTask)) {
           toast("Record this payment in Finance?", {
             action: {
               label: "Open Finance",
-              onClick: () => router.push("/life?tab=finance"),
+              onClick: () =>
+                router.push("/life?tab=finance&action=log-expense"),
             },
           });
         }
+      },
+    },
+  );
+
+  const startTimer = useStandMutation((id: string) => tasksApi.startTimer(id), {
+    invalidateKeys: invalidate,
+    onSuccess: () => toast.success("Timer started"),
+  });
+
+  const bulkDone = useStandMutation(
+    (ids: string[]) =>
+      Promise.all(
+        ids.map((id) =>
+          tasksApi.update(id, {
+            taskStatus: "done",
+            completedAt: new Date().toISOString(),
+          }),
+        ),
+      ),
+    {
+      invalidateKeys: invalidate,
+      onSuccess: () => {
+        setSelectedIds(new Set());
+        toast.success("Tasks marked done");
       },
     },
   );
@@ -384,6 +435,55 @@ export function TasksModule() {
 
       <ModuleRelations links={relationLinks} />
 
+      <Tabs value={ppfTab} onValueChange={(v) => setPpfTab(v as typeof ppfTab)}>
+        <TabsList className="mb-4 h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
+          {(["present", "past", "future", "all"] as const).map((tab) => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="h-8 rounded-full px-3 capitalize data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {ppfTab === "past" && <TaskPastView query={query} label={label} />}
+      {ppfTab === "present" && (
+        <TaskPresentView
+          tasks={allTasks ?? []}
+          selectedIds={selectedIds}
+          onToggleSelect={(id) =>
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            })
+          }
+          onReport={(t) => {
+            setReportTask(t);
+            setReportMinutes(String(t.estimatedMinutes ?? 60));
+          }}
+          onEdit={(t) => {
+            setEditTask(t);
+            setOpen(true);
+          }}
+          onStartTimer={(id) => startTimer.mutate(id)}
+          onBulkDone={() => bulkDone.mutate([...selectedIds])}
+        />
+      )}
+      {ppfTab === "future" && (
+        <TaskFutureView
+          tasks={allTasks ?? []}
+          onEdit={(t) => {
+            setEditTask(t);
+            setOpen(true);
+          }}
+        />
+      )}
+      {ppfTab === "all" && (
       <DataTable
         columns={columns}
         data={tasks}
@@ -395,6 +495,7 @@ export function TasksModule() {
         }}
         onDelete={(row) => setDeleteId(row.id)}
       />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -406,9 +507,10 @@ export function TasksModule() {
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              const hours = Number(fd.get("hours") || 0);
-              const mins = Number(fd.get("mins") || 0);
-              const estimatedMinutes = hours * 60 + mins;
+              const timeStr = String(fd.get("plannedTime") ?? "");
+              const parsed = parseTimeInput(timeStr);
+              const estimatedMinutes = parsed ?? 0;
+              const isRecurring = fd.get("isRecurring") === "on";
               const data: Partial<Task> = {
                 title: String(fd.get("title")),
                 description:
@@ -425,6 +527,11 @@ export function TasksModule() {
                 scheduledAt: String(fd.get("scheduledAt") ?? "") || undefined,
                 estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : undefined,
                 syncToCalendar: fd.get("syncToCalendar") === "on",
+                isRecurring,
+                recurringInterval: isRecurring
+                  ? (String(fd.get("recurringInterval")) as Task["recurringInterval"])
+                  : "none",
+                parentTaskId: String(fd.get("parentTaskId") || "") || undefined,
               };
               save.mutate({ id: editTask?.id, data });
             }}
@@ -442,36 +549,15 @@ export function TasksModule() {
               rows={2}
               defaultValue={editTask?.description}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Planned hours</Label>
-                <Input
-                  name="hours"
-                  type="number"
-                  min={0}
-                  max={24}
-                  defaultValue={
-                    editTask?.estimatedMinutes
-                      ? Math.floor(editTask.estimatedMinutes / 60)
-                      : 2
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Planned minutes</Label>
-                <Input
-                  name="mins"
-                  type="number"
-                  min={0}
-                  max={59}
-                  defaultValue={
-                    editTask?.estimatedMinutes
-                      ? editTask.estimatedMinutes % 60
-                      : 0
-                  }
-                />
-              </div>
-            </div>
+            <FormField
+              label="Planned time (e.g. 2h 30m)"
+              name="plannedTime"
+              defaultValue={minutesToTimeInput(editTask?.estimatedMinutes ?? 120)}
+              placeholder="2h 30m"
+            />
+            <p className="text-xs text-muted-foreground -mt-2">
+              Use life area for routing (work, health). Category is a free tag.
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <FormSelect
                 label="Status"
@@ -547,6 +633,22 @@ export function TasksModule() {
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                name="isRecurring"
+                defaultChecked={editTask?.isRecurring}
+              />
+              Recurring task template
+            </label>
+            <FormSelect
+              label="Repeat interval"
+              name="recurringInterval"
+              defaultValue={editTask?.recurringInterval ?? "weekly"}
+              options={RECURRING_INTERVALS.filter((i) => i !== "none").map(
+                (i) => ({ value: i, label: i }),
+              )}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
                 name="syncToCalendar"
                 defaultChecked={editTask?.syncToCalendar !== false}
               />
@@ -590,6 +692,15 @@ export function TasksModule() {
                 onChange={(e) => setReportMinutes(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="completion-note">What did you achieve?</Label>
+              <Input
+                id="completion-note"
+                value={reportNote}
+                onChange={(e) => setReportNote(e.target.value)}
+                placeholder="Read Genesis 1–12…"
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
               This marks the plan done and updates your dashboard achievement
               (planned vs achieved).
@@ -607,6 +718,7 @@ export function TasksModule() {
                 report.mutate({
                   id: reportTask.id,
                   timeSpentMinutes: n,
+                  completionNote: reportNote || undefined,
                   hintTask: reportTask,
                 });
               }}

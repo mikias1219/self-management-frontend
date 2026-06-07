@@ -19,3 +19,4 @@ export * from "./settings";
 export * from "./ai-coach";
 export * from "./integrations";
 export * from "./productivity";
+export * from "./timeline";

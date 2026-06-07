@@ -3,6 +3,7 @@ import { createCrudApi } from "./crud";
 import type {
   Budget,
   CycleAllocation,
+  CycleDetail,
   ExpenseCategory,
   FinanceAccount,
   FinanceCycle,
@@ -39,6 +40,10 @@ export const financeApi = {
       apiClient.get<FinanceCycle[]>("/finance/cycles").then((r) => r.data),
     getOne: (id: string) =>
       apiClient.get<FinanceCycle>(`/finance/cycles/${id}`).then((r) => r.data),
+    getDetail: (id: string) =>
+      apiClient
+        .get<CycleDetail>(`/finance/cycles/${id}/detail`)
+        .then((r) => r.data),
     getCurrent: () =>
       apiClient
         .get<FinanceCycle | null>("/finance/cycles/current")

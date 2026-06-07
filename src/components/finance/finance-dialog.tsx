@@ -230,6 +230,17 @@ export function FinanceDialog({
                 toast.error("Select a savings goal for this transfer");
                 return;
               }
+              if (
+                txPreset === "pay_obligation" &&
+                presetValues?.amount != null &&
+                amount != null &&
+                Math.abs(amount - presetValues.amount) > 0.01
+              ) {
+                const ok = window.confirm(
+                  `You're paying ${amount} but expected ${presetValues.amount}. Record as partial payment?`,
+                );
+                if (!ok) return;
+              }
               onSubmitTx({
                 accountId,
                 toAccountId: optionalUuid(fd.get("toAccountId")),
@@ -255,6 +266,12 @@ export function FinanceDialog({
                       ) as FinanceTransaction["paymentMethod"]) || undefined
                     : undefined,
                 savingsGoalId: optionalUuid(fd.get("savingsGoalId")),
+                isWastage: fd.get("isWastage") === "on",
+                isPartialPayment:
+                  txPreset === "pay_obligation" &&
+                  presetValues?.amount != null &&
+                  amount != null &&
+                  Math.abs(amount - presetValues.amount) > 0.01,
               });
             }}
           >
@@ -599,6 +616,17 @@ export function FinanceDialog({
                   ...incomeCats.map((c) => ({ value: c.id, label: c.name })),
                 ]}
               />
+            )}
+
+            {(isExpense || txPreset === "pay_obligation") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="isWastage"
+                  defaultChecked={editTx?.isWastage}
+                />
+                Mark as wasteful spending
+              </label>
             )}
 
             {(isExpense || txPreset === "pay_obligation") && (

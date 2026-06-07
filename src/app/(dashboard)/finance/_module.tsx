@@ -12,6 +12,7 @@ import {
   PiggyBank,
   Plus,
   Receipt,
+  Settings2,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -65,6 +66,13 @@ import { getApiErrorMessage } from "@/lib/utils/api-error";
 import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
 import { useStandUi } from "@/stores/use-stand";
+import { CycleDetailSheet } from "@/components/finance/cycle-detail-sheet";
+import {
+  FinancePastView,
+  FinancePresentView,
+  FinanceFutureView,
+} from "@/components/finance/finance-ppf-views";
+import { FinanceOnboardingWizard } from "@/components/finance/finance-onboarding-wizard";
 
 const MetricChart = dynamic(
   () =>
@@ -108,6 +116,8 @@ export function FinanceModule() {
     label: string;
     action: () => void;
   } | null>(null);
+  const [cycleDetailId, setCycleDetailId] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const dialogOpen = dialogMode !== null;
   const onOverview = pageTab === "overview";
@@ -117,6 +127,9 @@ export function FinanceModule() {
   const onSavings = pageTab === "savings";
   const onObligations = pageTab === "obligations";
   const onCycle = pageTab === "cycle";
+  const onPast = pageTab === "past";
+  const onPresent = pageTab === "present";
+  const onFuture = pageTab === "future";
   const onCategories = pageTab === "categories";
 
   const summary = useStandData(
@@ -125,7 +138,13 @@ export function FinanceModule() {
     {
       enabled:
         authenticated &&
-        (onOverview || onObligations || onCycle || dialogOpen),
+        (onOverview ||
+          onObligations ||
+          onCycle ||
+          onPast ||
+          onPresent ||
+          onFuture ||
+          dialogOpen),
     },
   );
   const financeIntel = useStandData(
@@ -605,17 +624,31 @@ export function FinanceModule() {
 
   const dailyTabs = [
     { id: "overview", label: "Overview" },
+    { id: "present", label: "Present" },
+    { id: "past", label: "Past" },
+    { id: "future", label: "Future" },
     { id: "transactions", label: "Transactions" },
     { id: "obligations", label: "Obligations", badge: overdueCount },
-  ] as const;
-
-  const manageTabs = [
-    { id: "accounts", label: "Accounts" },
+    { id: "cycle", label: "Cycle" },
     { id: "budgets", label: "Budgets" },
     { id: "savings", label: "Savings" },
-    { id: "categories", label: "Categories" },
-    { id: "cycle", label: "Cycle" },
   ] as const;
+
+  const settingsTabs = [
+    { id: "accounts", label: "Accounts" },
+    { id: "categories", label: "Categories" },
+  ] as const;
+
+  useEffect(() => {
+    if (
+      s &&
+      s.totals.accountCount === 0 &&
+      !s.financeOnboardingCompleted &&
+      onOverview
+    ) {
+      setOnboardingOpen(true);
+    }
+  }, [s?.totals.accountCount, s?.financeOnboardingCompleted, onOverview]);
 
   if (!authenticated) {
     return (
@@ -721,17 +754,18 @@ export function FinanceModule() {
                   variant="ghost"
                   className={cn(
                     "ml-auto h-8 gap-1 rounded-full text-xs text-muted-foreground",
-                    manageTabs.some((t) => t.id === pageTab) &&
+                    settingsTabs.some((t) => t.id === pageTab) &&
                       "bg-muted text-foreground",
                   )}
                 >
-                  Manage
+                  <Settings2 className="size-3.5" />
+                  Settings
                   <ChevronDown className="size-3.5 opacity-60" />
                 </Button>
               }
             />
             <DropdownMenuContent align="end">
-              {manageTabs.map((tab) => (
+              {settingsTabs.map((tab) => (
                 <DropdownMenuItem
                   key={tab.id}
                   onClick={() => setPageTab("finance", tab.id)}
@@ -742,6 +776,23 @@ export function FinanceModule() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {pageTab === "past" && (
+          <FinancePastView
+            summary={s}
+            pastCycles={pastCycles}
+            currency={currency}
+            onCycleClick={setCycleDetailId}
+          />
+        )}
+
+        {pageTab === "present" && (
+          <FinancePresentView summary={s} currency={currency} />
+        )}
+
+        {pageTab === "future" && (
+          <FinanceFutureView summary={s} currency={currency} />
+        )}
 
         {pageTab === "overview" && (
         <div className="mt-4 space-y-6">
@@ -1142,6 +1193,25 @@ export function FinanceModule() {
                 return (
               <div className="rounded-lg border bg-card p-4 space-y-3">
                 <p className="font-medium">Cycle allocation</p>
+                {(s?.savingsGoals ?? []).some(
+                  (g) => (g.savingsShortfallCarryForward ?? 0) > 0,
+                ) && (
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-1">
+                    <p className="font-medium text-amber-800 flex items-center gap-1.5">
+                      <AlertCircle className="size-4" />
+                      Savings shortfall from last cycle
+                    </p>
+                    {(s?.savingsGoals ?? [])
+                      .filter((g) => (g.savingsShortfallCarryForward ?? 0) > 0)
+                      .map((g) => (
+                        <p key={g.id} className="text-amber-700">
+                          {g.name}: add{" "}
+                          {formatMoney(g.savingsShortfallCarryForward!, currency)}{" "}
+                          to catch up
+                        </p>
+                      ))}
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   Net salary {formatMoney(netSalary, currency)} — set fixed and
                   savings; spending fills the remainder.
@@ -1284,10 +1354,12 @@ export function FinanceModule() {
                   <h3 className="text-sm font-medium">Past cycles</h3>
                   <ul className="space-y-2 text-sm">
                     {pastCycles.map((c) => (
-                      <li
-                        key={c.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2"
-                      >
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className="w-full flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-left hover:bg-muted/50"
+                          onClick={() => setCycleDetailId(c.id)}
+                        >
                         <span>
                           {c.startDate} → {c.endDate}
                         </span>
@@ -1299,6 +1371,7 @@ export function FinanceModule() {
                             ? ` · Top: ${c.largestExpenseCategory}`
                             : ""}
                         </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1415,6 +1488,13 @@ export function FinanceModule() {
 
         {pageTab === "categories" && (
         <div className="mt-4 space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Category configuration lives here and in{" "}
+            <Link href="/settings" className="text-primary underline">
+              Settings → Finance
+            </Link>
+            .
+          </p>
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-medium">Expense categories</h3>
@@ -1629,6 +1709,23 @@ export function FinanceModule() {
           deleteConfirm?.action();
           setDeleteConfirm(null);
         }}
+      />
+
+      <CycleDetailSheet
+        cycleId={cycleDetailId}
+        onClose={() => setCycleDetailId(null)}
+        currency={currency}
+      />
+
+      <FinanceOnboardingWizard
+        open={onboardingOpen}
+        onOpenChange={setOnboardingOpen}
+        salaryDay={userSettings.data?.salaryDay ?? 25}
+        onOpenDialog={(mode) => {
+          if (mode === "transaction") openTransaction("salary");
+          else openAdd(mode);
+        }}
+        onGoToCycle={() => setPageTab("finance", "cycle")}
       />
     </ModuleShell>
   );

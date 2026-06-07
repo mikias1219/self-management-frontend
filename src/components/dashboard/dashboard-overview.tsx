@@ -31,6 +31,7 @@ import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
 import { useStandUi } from "@/stores/use-stand";
 import { toast } from "sonner";
+import type { PosDashboardOverview } from "@/lib/types/dashboard";
 
 function savingsRateColor(rate: number) {
   if (rate > 15) return "text-emerald-600";
@@ -65,9 +66,25 @@ function insightActionLink(insight: string): { href: string; label: string } | n
     lower.includes("salary") ||
     lower.includes("obligation")
   ) {
-    return { href: "/life", label: "Go to finance" };
+    return { href: "/life?tab=finance", label: "Go to finance" };
   }
   return null;
+}
+
+function getAiInsight(insight: PosDashboardOverview["aiInsight"]) {
+  if (typeof insight === "string") {
+    const link = insightActionLink(insight);
+    return {
+      text: insight,
+      href: link?.href ?? "/today",
+      label: link?.label ?? "Open Today",
+    };
+  }
+  return {
+    text: insight.text,
+    href: insight.actionHref,
+    label: "Take action",
+  };
 }
 
 /** Personal OS dashboard — three compact sections, one screen. */
@@ -176,6 +193,16 @@ export function DashboardOverview() {
           tint: savingsRateColor(data.financialSnapshot.savingsRate),
         },
         {
+          label: "Task completion",
+          value: formatPercent(data.taskStatus.completionRate),
+          tint: "text-sky-600",
+        },
+        {
+          label: "Overdue bills",
+          value: String(financeSummary?.obligations.overdue.length ?? data.taskStatus.overdue),
+          tint: (financeSummary?.obligations.overdue.length ?? 0) > 0 ? "text-red-600" : "text-muted-foreground",
+        },
+        {
           label: "Studied today",
           value: formatMinutes(data.todayFocus.studyMinutes),
           tint: "text-emerald-600",
@@ -183,7 +210,7 @@ export function DashboardOverview() {
       ]
     : null;
 
-  const insightLink = data ? insightActionLink(data.aiInsight) : null;
+  const insight = data ? getAiInsight(data.aiInsight) : null;
 
   return (
     <div className="space-y-5">
@@ -206,7 +233,7 @@ export function DashboardOverview() {
               className="shrink-0"
               onClick={() =>
                 openAiChat(
-                  `Based on this insight, help me take action: "${data.aiInsight}"`,
+                  `Based on this insight, help me take action: "${insight?.text ?? data.aiInsight}"`,
                 )
               }
             >
@@ -223,13 +250,13 @@ export function DashboardOverview() {
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
               <div className="min-w-0 space-y-1">
-                <p className="text-sm leading-relaxed">{data.aiInsight}</p>
-                {insightLink && (
+                <p className="text-sm leading-relaxed">{insight?.text}</p>
+                {insight && (
                   <Link
-                    href={insightLink.href}
+                    href={insight.href}
                     className="inline-flex items-center gap-0.5 text-xs text-primary"
                   >
-                    {insightLink.label} <ArrowRight className="size-3" />
+                    {insight.label} <ArrowRight className="size-3" />
                   </Link>
                 )}
               </div>
@@ -288,10 +315,10 @@ export function DashboardOverview() {
               Today&apos;s focus
             </p>
             <Link
-              href="/productivity"
+              href="/today"
               className="inline-flex items-center gap-0.5 text-xs text-primary"
             >
-              Open <ArrowRight className="size-3" />
+              Open Today hub <ArrowRight className="size-3" />
             </Link>
           </div>
           <Card className="border shadow-sm">

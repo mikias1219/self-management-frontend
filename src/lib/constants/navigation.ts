@@ -31,6 +31,14 @@ export const NAV_GROUP_COLORS: Record<string, string> = {
 /** Sidebar: one entry per life area; related modules live in hub tabs. */
 export const NAV_ITEMS: NavItem[] = [
   {
+    title: "Today",
+    href: "/today",
+    icon: LayoutDashboard,
+    group: "Overview",
+    color: "bg-violet-500/15 text-violet-600",
+    description: "Unified view — tasks, habits, bills, spending",
+  },
+  {
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
@@ -88,6 +96,13 @@ export const NAV_GROUPS = ["Overview", "Life areas"] as const;
 export const NAV_SEARCH_EXTRAS: NavItem[] = [
   {
     title: "Today",
+    href: "/today",
+    icon: ListChecks,
+    group: "Overview",
+    color: "bg-violet-500/15 text-violet-600",
+  },
+  {
+    title: "Today (Productivity)",
     href: "/productivity?tab=today",
     icon: ListChecks,
     group: "Productivity",

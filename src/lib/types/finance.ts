@@ -58,6 +58,8 @@ export interface FinanceTransaction extends BaseEntity {
   recurringInterval?: RecurringInterval;
   linkedTaskId?: string;
   savingsGoalId?: string;
+  isWastage?: boolean;
+  isPartialPayment?: boolean;
 }
 
 export interface Budget extends BaseEntity {
@@ -182,6 +184,49 @@ export interface FinanceSummaryCycle {
   remainingUnallocated: number;
 }
 
+export interface CycleDetail {
+  cycle: {
+    id: string;
+    startDate: string;
+    endDate: string;
+    status: FinanceCycleStatus;
+    grossSalary: number;
+    netSalary: number;
+    fixedObligations: number;
+    savingsTarget: number;
+    spendingBudget: number;
+    totalFixedObligations: number;
+    totalSavingsAllocated: number;
+    totalVariableSpent: number;
+    remainingBalance: number;
+    savingsShortfall: number;
+    unspentBudget: number;
+    actualSavingsRate?: number;
+    financialHealthScore?: number;
+    fixedObligationRate?: number;
+    discretionaryRate?: number;
+    topExpenseCategory?: string;
+    closedAt?: string;
+  };
+  transactions: {
+    id: string;
+    transactionType: TransactionType;
+    amount: number;
+    transactionDate: string;
+    description?: string;
+    categoryName?: string;
+    isWastage?: boolean;
+    isPartialPayment?: boolean;
+  }[];
+  obligations: {
+    id: string;
+    name: string;
+    expectedAmount: number;
+    dueDate: string;
+    status: PendingObligationStatus;
+  }[];
+}
+
 export interface FinanceSummary {
   period: DateRangeQuery;
   range: { start: string; end: string };
@@ -199,7 +244,15 @@ export interface FinanceSummary {
     burnRate?: number;
     forecastEndOfMonthExpense?: number;
     forecastEndOfMonthNet?: number;
+    totalWastage?: number;
   };
+  annualPlan?: {
+    targetAmount: number;
+    currentProgress: number;
+    progressPercent: number;
+    year: number;
+  } | null;
+  financeOnboardingCompleted?: boolean;
   budgets: FinanceSummaryBudget[];
   savingsGoals: FinanceSummarySavingsGoal[];
   currentCycle: FinanceSummaryCycle | null;

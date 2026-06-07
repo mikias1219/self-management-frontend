@@ -33,7 +33,7 @@ export interface PosDashboardOverview {
     completionRate: number;
     productivityScore: number;
   };
-  aiInsight: string;
+  aiInsight: string | { text: string; actionType: string; actionHref: string };
   dailySummary: string;
   scores: {
     productivityScore: number;
