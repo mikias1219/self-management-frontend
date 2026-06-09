@@ -40,6 +40,11 @@ export function TodayView() {
   const [filter, setFilter] = useState<DayFilter>("remaining");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [calendarEventId, setCalendarEventId] = useState<string | null>(null);
+  const [calendarEventDay, setCalendarEventDay] = useState<string | null>(null);
+  const [deleteCalendarEventId, setDeleteCalendarEventId] = useState<
+    string | null
+  >(null);
   const [syncToCalendar, setSyncToCalendar] = useState(true);
   const [form, setForm] = useState<TaskFormValues>({
     title: "",
@@ -82,6 +87,8 @@ export function TodayView() {
 
   const openCreate = () => {
     setEditId(null);
+    setCalendarEventId(null);
+    setCalendarEventDay(null);
     setForm({
       title: "",
       time: format(new Date(), "HH:mm"),
@@ -93,12 +100,32 @@ export function TodayView() {
 
   const openEdit = (item: ScheduleItem) => {
     setEditId(item.entityId);
+    setCalendarEventId(null);
     setForm({
       title: item.title,
       time: format(parseISO(item.start), "HH:mm"),
       minutes: String(item.measurable?.plannedMinutes ?? 60),
     });
     setSyncToCalendar(true);
+    setDialogOpen(true);
+  };
+
+  const openCalendarEvent = (item: ScheduleItem) => {
+    const start = parseISO(item.start);
+    const end = item.end ? parseISO(item.end) : start;
+    const durationMins = Math.max(
+      15,
+      Math.round((end.getTime() - start.getTime()) / 60_000) || 60,
+    );
+    setEditId(null);
+    setCalendarEventId(item.entityId);
+    setCalendarEventDay(format(start, "yyyy-MM-dd"));
+    setForm({
+      title: item.title,
+      time: format(start, "HH:mm"),
+      minutes: String(durationMins),
+    });
+    setSyncToCalendar(false);
     setDialogOpen(true);
   };
 
@@ -110,6 +137,7 @@ export function TodayView() {
       dueDate: string;
       estimatedMinutes: number;
       syncToCalendar: boolean;
+      googleCalendarEventId?: string;
     }) =>
       payload.id
         ? tasksApi.update(payload.id, {
@@ -125,14 +153,19 @@ export function TodayView() {
             dueDate: payload.dueDate,
             estimatedMinutes: payload.estimatedMinutes,
             syncToCalendar: payload.syncToCalendar,
+            googleCalendarEventId: payload.googleCalendarEventId,
           }),
     {
       invalidateKeys: INVALIDATE,
       invalidateAll: false,
-      onSuccess: async (task: Task) => {
+      onSuccess: async (task: Task, arg) => {
         setDialogOpen(false);
+        setCalendarEventId(null);
+        setCalendarEventDay(null);
         await refetch();
-        if (calendarReady && task.syncToCalendar && task.googleCalendarEventId) {
+        if (arg.googleCalendarEventId) {
+          toast.success("Imported from Google Calendar — you can edit it as a task");
+        } else if (calendarReady && task.syncToCalendar && task.googleCalendarEventId) {
           toast.success("Task saved — synced to Google");
         } else {
           toast.success("Task saved");
@@ -165,6 +198,20 @@ export function TodayView() {
     },
   );
 
+  const deleteCalendarEvent = useStandMutation(
+    (eventId: string) => integrationsApi.googleCalendar.deleteEvent(eventId),
+    {
+      invalidateKeys: INVALIDATE,
+      invalidateAll: false,
+      onSuccess: async () => {
+        setDeleteCalendarEventId(null);
+        toast.success("Removed from Google Calendar");
+        await refetch();
+      },
+      onError: () => toast.error("Could not remove calendar event"),
+    },
+  );
+
   const deleteTask = useStandMutation((id: string) => tasksApi.remove(id), {
     invalidateKeys: INVALIDATE,
     invalidateAll: false,
@@ -186,7 +233,7 @@ export function TodayView() {
       toast.error("Enter a task name");
       return;
     }
-    const day = format(new Date(), "yyyy-MM-dd");
+    const day = calendarEventDay ?? format(new Date(), "yyyy-MM-dd");
     const scheduledAt = new Date(`${day}T${form.time}`);
     saveTask.mutate({
       id: editId ?? undefined,
@@ -195,6 +242,7 @@ export function TodayView() {
       dueDate: scheduledAt.toISOString(),
       estimatedMinutes: parseInt(form.minutes, 10) || 60,
       syncToCalendar: calendarReady && syncToCalendar,
+      googleCalendarEventId: calendarEventId ?? undefined,
     });
   };
 
@@ -316,23 +364,37 @@ export function TodayView() {
         <div className="pl-0 md:pl-2">
           {list.map((item, i) => {
             const isCalendar = item.kind === "calendar";
+            const isGoogleEvent =
+              isCalendar && item.meta?.source === "google_api";
             return (
               <TodayTaskRow
                 key={item.id}
                 item={item}
                 isLast={i === list.length - 1}
                 variant={isCalendar ? "calendar" : "task"}
-                onOpen={isCalendar ? undefined : () => openEdit(item)}
+                onOpen={
+                  isCalendar
+                    ? () => openCalendarEvent(item)
+                    : () => openEdit(item)
+                }
                 onToggle={
                   !isCalendar && filter === "remaining"
                     ? () => completeTask.mutate(item.entityId)
                     : undefined
                 }
-                onEdit={isCalendar ? undefined : () => openEdit(item)}
+                onEdit={
+                  isCalendar
+                    ? () => openCalendarEvent(item)
+                    : () => openEdit(item)
+                }
                 onDelete={
-                  !isCalendar && filter === "remaining"
-                    ? () => setDeleteId(item.entityId)
-                    : undefined
+                  filter !== "remaining"
+                    ? undefined
+                    : isGoogleEvent && calendarReady
+                      ? () => setDeleteCalendarEventId(item.entityId)
+                      : !isCalendar
+                        ? () => setDeleteId(item.entityId)
+                        : undefined
                 }
                 toggling={completeTask.isPending}
               />
@@ -341,10 +403,22 @@ export function TodayView() {
         </div>
       )}
 
+      <DeleteConfirmDialog
+        open={!!deleteCalendarEventId}
+        onOpenChange={(o) => !o && setDeleteCalendarEventId(null)}
+        title="Remove from Google Calendar?"
+        description="Deletes this event from your Google Calendar. You can also import it as a LifeOS task first."
+        onConfirm={() =>
+          deleteCalendarEventId &&
+          deleteCalendarEvent.mutate(deleteCalendarEventId)
+        }
+        loading={deleteCalendarEvent.isPending}
+      />
+
       <TaskFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        mode={editId ? "edit" : "create"}
+        mode={editId ? "edit" : calendarEventId ? "edit" : "create"}
         values={form}
         onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         onSubmit={handleSubmit}

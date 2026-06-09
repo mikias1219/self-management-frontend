@@ -131,7 +131,7 @@ export function TodayTaskRow({
               </p>
             </div>
 
-            {!isCalendar && !done && (onEdit || onDelete) && (
+            {!done && (onEdit || onDelete) && (
               <div
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => e.stopPropagation()}

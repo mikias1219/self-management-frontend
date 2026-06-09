@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CheckCircle2, CheckSquare, Plus } from "lucide-react";
+import { CheckCircle2, CheckSquare, ChevronDown, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -56,6 +56,7 @@ export function TasksModule() {
   const { query, label } = usePeriod("tasks");
   const authenticated = hasAuthToken();
   const [open, setOpen] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [reportTask, setReportTask] = useState<Task | null>(null);
   const [reportMinutes, setReportMinutes] = useState("");
@@ -515,7 +516,7 @@ export function TasksModule() {
                 title: String(fd.get("title")),
                 description:
                   String(fd.get("description") ?? "").trim() || undefined,
-                taskStatus: fd.get("taskStatus") as TaskStatus,
+                taskStatus: (fd.get("taskStatus") as TaskStatus) || "todo",
                 priority: fd.get("priority") as TaskPriority,
                 startDate: String(fd.get("startDate") ?? "") || undefined,
                 dueDate: String(fd.get("dueDate") ?? "") || undefined,
@@ -543,45 +544,7 @@ export function TasksModule() {
               defaultValue={editTask?.title}
               placeholder="Read Bible"
             />
-            <FormTextarea
-              label="Notes"
-              name="description"
-              rows={2}
-              defaultValue={editTask?.description}
-            />
-            <FormField
-              label="Planned time (e.g. 2h 30m)"
-              name="plannedTime"
-              defaultValue={minutesToTimeInput(editTask?.estimatedMinutes ?? 120)}
-              placeholder="2h 30m"
-            />
-            <p className="text-xs text-muted-foreground -mt-2">
-              Use life area for routing (work, health). Category is a free tag.
-            </p>
             <div className="grid grid-cols-2 gap-3">
-              <FormSelect
-                label="Status"
-                name="taskStatus"
-                defaultValue={editTask?.taskStatus ?? "todo"}
-                options={STATUSES.map((s) => ({
-                  value: s,
-                  label: s.replace("_", " "),
-                }))}
-              />
-              <FormSelect
-                label="Priority"
-                name="priority"
-                defaultValue={editTask?.priority ?? "medium"}
-                options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                label="Start date"
-                name="startDate"
-                type="date"
-                defaultValue={editTask?.startDate?.slice(0, 10)}
-              />
               <FormField
                 label="Due date"
                 name="dueDate"
@@ -591,71 +554,120 @@ export function TasksModule() {
                   format(new Date(), "yyyy-MM-dd")
                 }
               />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <FormSelect
-                label="Life area"
-                name="lifeArea"
-                defaultValue={editTask?.lifeArea ?? "personal"}
-                options={LIFE_AREAS.map((a) => ({
-                  value: a.value,
-                  label: a.label,
-                }))}
-              />
-              <FormSelect
-                label="Linked goal"
-                name="goalId"
-                defaultValue={editTask?.goalId ?? ""}
-                options={[
-                  { value: "", label: "None" },
-                  ...(goals ?? []).map((g) => ({
-                    value: g.id,
-                    label: g.title,
-                  })),
-                ]}
+                label="Priority"
+                name="priority"
+                defaultValue={editTask?.priority ?? "medium"}
+                options={PRIORITIES.map((p) => ({ value: p, label: p }))}
               />
             </div>
-            <FormField
-              label="Category"
-              name="category"
-              defaultValue={editTask?.category}
-              placeholder="spiritual, work…"
-            />
-            <FormField
-              label="Scheduled (for Google Calendar)"
-              name="scheduledAt"
-              type="datetime-local"
-              defaultValue={
-                editTask?.scheduledAt?.slice(0, 16) ??
-                editTask?.dueDate?.slice(0, 16)
-              }
-            />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="isRecurring"
-                defaultChecked={editTask?.isRecurring}
-              />
-              Recurring task template
-            </label>
             <FormSelect
-              label="Repeat interval"
-              name="recurringInterval"
-              defaultValue={editTask?.recurringInterval ?? "weekly"}
-              options={RECURRING_INTERVALS.filter((i) => i !== "none").map(
-                (i) => ({ value: i, label: i }),
-              )}
+              label="Linked goal"
+              name="goalId"
+              defaultValue={editTask?.goalId ?? ""}
+              options={[
+                { value: "", label: "None" },
+                ...(goals ?? []).map((g) => ({
+                  value: g.id,
+                  label: g.title,
+                })),
+              ]}
             />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="syncToCalendar"
-                defaultChecked={editTask?.syncToCalendar !== false}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1 px-0 text-muted-foreground"
+              onClick={() => setShowMoreOptions((v) => !v)}
+            >
+              <ChevronDown
+                className={`size-4 transition-transform ${showMoreOptions ? "rotate-180" : ""}`}
               />
-              Sync to Google Calendar when saved
-            </label>
-            {editTask?.googleCalendarEventId && (
-              <p className="text-xs text-emerald-600">Linked to Google Calendar</p>
+              More options
+            </Button>
+            {showMoreOptions && (
+              <div className="space-y-4 rounded-lg border bg-muted/30 p-3">
+                <FormSelect
+                  label="Status"
+                  name="taskStatus"
+                  defaultValue={editTask?.taskStatus ?? "todo"}
+                  options={STATUSES.map((s) => ({
+                    value: s,
+                    label: s.replace("_", " "),
+                  }))}
+                />
+                <FormTextarea
+                  label="Notes"
+                  name="description"
+                  rows={2}
+                  defaultValue={editTask?.description}
+                />
+                <FormField
+                  label="Planned time (e.g. 2h 30m)"
+                  name="plannedTime"
+                  defaultValue={minutesToTimeInput(editTask?.estimatedMinutes ?? 120)}
+                  placeholder="2h 30m"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    label="Start date"
+                    name="startDate"
+                    type="date"
+                    defaultValue={editTask?.startDate?.slice(0, 10)}
+                  />
+                  <FormSelect
+                    label="Life area"
+                    name="lifeArea"
+                    defaultValue={editTask?.lifeArea ?? "personal"}
+                    options={LIFE_AREAS.map((a) => ({
+                      value: a.value,
+                      label: a.label,
+                    }))}
+                  />
+                </div>
+                <FormField
+                  label="Category"
+                  name="category"
+                  defaultValue={editTask?.category}
+                  placeholder="spiritual, work…"
+                />
+                <FormField
+                  label="Scheduled (for Google Calendar)"
+                  name="scheduledAt"
+                  type="datetime-local"
+                  defaultValue={
+                    editTask?.scheduledAt?.slice(0, 16) ??
+                    editTask?.dueDate?.slice(0, 16)
+                  }
+                />
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="isRecurring"
+                    defaultChecked={editTask?.isRecurring}
+                  />
+                  Recurring task template
+                </label>
+                <FormSelect
+                  label="Repeat interval"
+                  name="recurringInterval"
+                  defaultValue={editTask?.recurringInterval ?? "weekly"}
+                  options={RECURRING_INTERVALS.filter((i) => i !== "none").map(
+                    (i) => ({ value: i, label: i }),
+                  )}
+                />
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="syncToCalendar"
+                    defaultChecked={editTask?.syncToCalendar !== false}
+                  />
+                  Sync to Google Calendar when saved
+                </label>
+                {editTask?.googleCalendarEventId && (
+                  <p className="text-xs text-emerald-600">Linked to Google Calendar</p>
+                )}
+              </div>
             )}
             <DialogFooter>
               <Button type="submit" disabled={save.isPending}>

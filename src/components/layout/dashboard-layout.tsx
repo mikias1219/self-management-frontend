@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
+import { MobileBottomNav } from "@/components/shared/mobile-bottom-nav";
 
 const FloatingAiChat = dynamic(
   () =>
@@ -26,6 +27,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20">{children}</main>
       </div>
       <FloatingAiChat />
+      <MobileBottomNav />
     </div>
   );
 }

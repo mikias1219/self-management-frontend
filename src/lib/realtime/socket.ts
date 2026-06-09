@@ -39,24 +39,14 @@ export function getRealtimeSocket(): Socket | null {
     auth: { token },
     transports: ["polling", "websocket"],
     reconnection: true,
-    reconnectionAttempts: 3,
+    reconnectionAttempts: 10,
     reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000,
     timeout: 8000,
     autoConnect: true,
   });
 
-  let failures = 0;
-  socket.on("connect_error", () => {
-    failures += 1;
-    if (failures >= 3) {
-      connectDisabled = true;
-      socket?.disconnect();
-      socket = null;
-    }
-  });
-
   socket.on("connect", () => {
-    failures = 0;
     connectDisabled = false;
   });
 

@@ -9,6 +9,8 @@ import { ModuleShell } from "@/components/shared/module-shell";
 import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { FormField, FormSelect, FormTextarea } from "@/components/shared/form-fields";
 import { ModuleRelations } from "@/components/shared/module-relations";
+import { GoalProgressSlider } from "@/components/shared/goal-progress-slider";
+import { AIInsightCard } from "@/components/shared/ai-insight-card";
 import { StatCard } from "@/components/shared/stat-card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -30,23 +32,26 @@ import type { GoalLevel } from "@/lib/types/goal";
 import { filterByDateField } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
 
-const LEVELS: GoalLevel[] = [
-  "vision",
-  "yearly",
-  "quarterly",
-  "monthly",
-  "weekly",
-  "daily",
-];
+const LEVELS: GoalLevel[] = ["life", "milestone", "target"];
 
-const LEVEL_LABELS: Record<GoalLevel, string> = {
-  vision: "Vision",
-  yearly: "Yearly",
-  quarterly: "Quarterly",
-  monthly: "Monthly",
-  weekly: "Weekly",
-  daily: "Daily",
+const LEVEL_LABELS: Record<string, string> = {
+  life: "Life Goals",
+  milestone: "Milestones",
+  target: "Weekly Targets",
+  vision: "Life Goals",
+  yearly: "Life Goals",
+  quarterly: "Milestones",
+  monthly: "Milestones",
+  weekly: "Weekly Targets",
+  daily: "Weekly Targets",
 };
+
+function normalizeGoalLevel(level: GoalLevel): GoalLevel {
+  if (level === "vision" || level === "yearly") return "life";
+  if (level === "quarterly" || level === "monthly") return "milestone";
+  if (level === "weekly" || level === "daily") return "target";
+  return level;
+}
 
 export function GoalsModule() {
   const { query, label } = usePeriod("goals");
@@ -83,7 +88,7 @@ export function GoalsModule() {
     const grouped = new Map<GoalLevel, Goal[]>();
     for (const level of LEVELS) grouped.set(level, []);
     for (const goal of goals) {
-      grouped.get(goal.level)?.push(goal);
+      grouped.get(normalizeGoalLevel(goal.level))?.push(goal);
     }
     return grouped;
   }, [goals]);
@@ -152,6 +157,8 @@ export function GoalsModule() {
 
       <ModuleRelations links={links} />
 
+      <AIInsightCard moduleKey="goals" />
+
       <div className="space-y-4">
         {LEVELS.map((level) => {
           const levelGoals = goalsByLevel.get(level) ?? [];
@@ -207,11 +214,12 @@ export function GoalsModule() {
                             </Button>
                           </div>
                         </div>
-                        <div className="mt-3 flex items-center gap-2">
-                          <Progress value={goal.progress} className="flex-1" />
-                          <span className="text-xs tabular-nums">
-                            {Math.round(goal.progress)}%
-                          </span>
+                        <div className="mt-3">
+                          <GoalProgressSlider
+                            goalId={goal.id}
+                            initialProgress={goal.progress}
+                            label={goal.title}
+                          />
                         </div>
                         {taskCount > 0 && (
                           <Link
@@ -273,8 +281,8 @@ export function GoalsModule() {
               <FormSelect
                 label="Level"
                 name="level"
-                defaultValue={editGoal?.level ?? "weekly"}
-                options={LEVELS.map((l) => ({ value: l, label: l }))}
+                defaultValue={editGoal ? normalizeGoalLevel(editGoal.level) : "target"}
+                options={LEVELS.map((l) => ({ value: l, label: LEVEL_LABELS[l] }))}
               />
               <FormField label="Progress %" name="progress" type="number" defaultValue={editGoal?.progress ?? 0} min="0" max="100" />
             </div>

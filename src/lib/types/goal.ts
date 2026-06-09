@@ -2,6 +2,9 @@ import type { BaseEntity } from "./common";
 import type { LifeArea } from "./life-area";
 
 export type GoalLevel =
+  | "life"
+  | "milestone"
+  | "target"
   | "vision"
   | "yearly"
   | "quarterly"

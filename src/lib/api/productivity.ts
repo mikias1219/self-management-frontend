@@ -34,4 +34,7 @@ export const productivityApi = {
         },
       })
       .then((r) => r.data),
+
+  getTodaySummary: () =>
+    apiClient.get("/productivity/today-summary").then((r) => r.data),
 };

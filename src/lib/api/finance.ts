@@ -23,6 +23,17 @@ export const financeApi = {
       apiClient
         .get<FinanceTransaction[]>("/finance/transactions", { params })
         .then((r) => r.data),
+    createSimple: (data: {
+      amount: number;
+      transactionType: string;
+      categoryId?: string;
+      description?: string;
+      transactionDate?: string;
+      accountId?: string;
+    }) =>
+      apiClient
+        .post<FinanceTransaction>("/finance/transactions/simple", data)
+        .then((r) => r.data),
   },
   budgets: createCrudApi<Budget>("/finance/budgets"),
   savingsGoals: createCrudApi<SavingsGoal>("/finance/savings-goals"),
@@ -62,5 +73,15 @@ export const financeApi = {
   getSummary: (params?: DateRangeQuery) =>
     apiClient
       .get<FinanceSummary>("/finance/summary", { params })
+      .then((r) => r.data),
+
+  getMonthSummary: (month?: string) =>
+    apiClient
+      .get("/finance/month-summary", { params: month ? { month } : undefined })
+      .then((r) => r.data),
+
+  getUpcomingBills: (days = 7) =>
+    apiClient
+      .get("/finance/upcoming-bills", { params: { days } })
       .then((r) => r.data),
 };

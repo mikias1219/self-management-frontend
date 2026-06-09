@@ -27,4 +27,10 @@ export const aiCoachApi = {
       })
       .then((r) => r.data);
   },
+
+  getModuleInsight(module: string) {
+    return apiClient
+      .get<{ insight: string }>("/ai-coach/module-insight", { params: { module } })
+      .then((r) => r.data);
+  },
 };

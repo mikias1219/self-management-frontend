@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowRightLeft,
-  Calendar,
   ChevronDown,
   DollarSign,
   PiggyBank,
@@ -67,12 +66,10 @@ import { formatMoney, formatPercent } from "@/lib/utils/period";
 import { cn } from "@/lib/utils";
 import { useStandUi } from "@/stores/use-stand";
 import { CycleDetailSheet } from "@/components/finance/cycle-detail-sheet";
-import {
-  FinancePastView,
-  FinancePresentView,
-  FinanceFutureView,
-} from "@/components/finance/finance-ppf-views";
 import { FinanceOnboardingWizard } from "@/components/finance/finance-onboarding-wizard";
+import { QuickAddTransactionDialog } from "@/components/finance/quick-add-transaction-dialog";
+import { FinanceOverview } from "@/components/finance/finance-overview";
+import { AIInsightCard } from "@/components/shared/ai-insight-card";
 
 const MetricChart = dynamic(
   () =>
@@ -94,6 +91,38 @@ const FinanceDialog = dynamic(
 
 type DialogMode = FinanceDialogMode;
 
+type FinanceTab =
+  | "budget"
+  | "transactions"
+  | "goals"
+  | "accounts"
+  | "categories"
+  | "cycle";
+
+function normalizeFinanceTab(tab: string): FinanceTab {
+  const legacy: Record<string, FinanceTab> = {
+    overview: "budget",
+    present: "budget",
+    past: "budget",
+    future: "budget",
+    obligations: "budget",
+    budgets: "budget",
+    savings: "goals",
+  };
+  if (tab in legacy) return legacy[tab]!;
+  if (
+    tab === "budget" ||
+    tab === "transactions" ||
+    tab === "goals" ||
+    tab === "accounts" ||
+    tab === "categories" ||
+    tab === "cycle"
+  ) {
+    return tab;
+  }
+  return "budget";
+}
+
 function classificationLabel(
   t?: ExpenseCategory["classificationType"],
 ): string | null {
@@ -104,8 +133,9 @@ function classificationLabel(
 export function FinanceModule() {
   const { query, label } = usePeriod("finance");
   const authenticated = hasAuthToken();
-  const pageTab = useStandUi((s) => s.pageTab["finance"] ?? "overview");
+  const rawPageTab = useStandUi((s) => s.pageTab["finance"] ?? "budget");
   const setPageTab = useStandUi((s) => s.setPageTab);
+  const pageTab = normalizeFinanceTab(rawPageTab);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [txPreset, setTxPreset] = useState<TxPreset>("default");
   const [txPresetValues, setTxPresetValues] = useState<TxPresetValues | undefined>();
@@ -118,59 +148,60 @@ export function FinanceModule() {
   } | null>(null);
   const [cycleDetailId, setCycleDetailId] = useState<string | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [advancedCycleMode, setAdvancedCycleMode] = useState(false);
+
+  useEffect(() => {
+    setAdvancedCycleMode(localStorage.getItem("financeAdvancedCycleMode") === "true");
+  }, []);
 
   const dialogOpen = dialogMode !== null;
-  const onOverview = pageTab === "overview";
+  const onBudget = pageTab === "budget";
   const onTransactions = pageTab === "transactions";
+  const onGoals = pageTab === "goals";
   const onAccounts = pageTab === "accounts";
-  const onBudgets = pageTab === "budgets";
-  const onSavings = pageTab === "savings";
-  const onObligations = pageTab === "obligations";
-  const onCycle = pageTab === "cycle";
-  const onPast = pageTab === "past";
-  const onPresent = pageTab === "present";
-  const onFuture = pageTab === "future";
   const onCategories = pageTab === "categories";
+  const onCycle = pageTab === "cycle";
 
   const summary = useStandData(
     ["finance", "summary", query],
     () => financeApi.getSummary(query),
     {
-      enabled:
-        authenticated &&
-        (onOverview ||
-          onObligations ||
-          onCycle ||
-          onPast ||
-          onPresent ||
-          onFuture ||
-          dialogOpen),
+      enabled: authenticated && (onBudget || onCycle || dialogOpen),
     },
   );
   const financeIntel = useStandData(
     ["analytics", "finance-intelligence", query],
     () => analyticsApi.getFinanceIntelligence(query),
-    { enabled: authenticated && onOverview },
+    { enabled: authenticated && onBudget },
   );
   const accounts = useStandData(
     ["finance", "accounts"],
     () => financeApi.accounts.getAll(),
-    { enabled: authenticated && (onAccounts || dialogOpen || onOverview) },
+    {
+      enabled:
+        authenticated &&
+        (onAccounts || onTransactions || dialogOpen || onBudget),
+      staleTime: 300_000,
+    },
   );
   const transactions = useStandData(
     ["finance", "transactions", query],
     () => financeApi.transactions.getAll(query),
-    { enabled: authenticated && (onTransactions || dialogOpen) },
+    {
+      enabled: authenticated && (onTransactions || dialogOpen),
+      staleTime: 300_000,
+    },
   );
   const budgets = useStandData(
     ["finance", "budgets"],
     () => financeApi.budgets.getAll(),
-    { enabled: authenticated && onBudgets },
+    { enabled: authenticated && onBudget, staleTime: 300_000 },
   );
   const savings = useStandData(
     ["finance", "savings"],
     () => financeApi.savingsGoals.getAll(),
-    { enabled: authenticated && onSavings },
+    { enabled: authenticated && onGoals, staleTime: 300_000 },
   );
   const expenseCats = useStandData(
     ["finance", "expense-cats"],
@@ -185,15 +216,15 @@ export function FinanceModule() {
   const recurring = useStandData(
     ["finance", "recurring"],
     () => financeApi.recurringObligations.getAll(),
-    { enabled: authenticated && onObligations },
+    { enabled: authenticated && onBudget, staleTime: 300_000 },
   );
   const allCycles = useStandData(
     ["finance", "cycles"],
     () => financeApi.cycles.getAll(),
-    { enabled: authenticated && onCycle },
+    { enabled: authenticated && onCycle && advancedCycleMode, staleTime: 300_000 },
   );
   const userSettings = useStandData(["settings"], () => settingsApi.get(), {
-    enabled: authenticated && onOverview,
+    enabled: authenticated && onBudget,
   });
   const linkedGoals = useStandData(["goals"], () => goalsApi.getAll(), {
     enabled: authenticated,
@@ -618,25 +649,18 @@ export function FinanceModule() {
     setDeleteConfirm({ label, action: fn });
   };
 
-  const salaryLoggedThisCycle =
-    Boolean(s?.currentCycle) && Number(s?.currentCycle?.netSalary ?? 0) > 0;
   const overdueCount = s?.obligations.overdue.length ?? 0;
 
   const dailyTabs = [
-    { id: "overview", label: "Overview" },
-    { id: "present", label: "Present" },
-    { id: "past", label: "Past" },
-    { id: "future", label: "Future" },
+    { id: "budget", label: "Budget", badge: overdueCount },
     { id: "transactions", label: "Transactions" },
-    { id: "obligations", label: "Obligations", badge: overdueCount },
-    { id: "cycle", label: "Cycle" },
-    { id: "budgets", label: "Budgets" },
-    { id: "savings", label: "Savings" },
+    { id: "goals", label: "Goals" },
   ] as const;
 
   const settingsTabs = [
     { id: "accounts", label: "Accounts" },
     { id: "categories", label: "Categories" },
+    ...(advancedCycleMode ? [{ id: "cycle" as const, label: "Cycle" }] : []),
   ] as const;
 
   useEffect(() => {
@@ -644,11 +668,11 @@ export function FinanceModule() {
       s &&
       s.totals.accountCount === 0 &&
       !s.financeOnboardingCompleted &&
-      onOverview
+      onBudget
     ) {
       setOnboardingOpen(true);
     }
-  }, [s?.totals.accountCount, s?.financeOnboardingCompleted, onOverview]);
+  }, [s?.totals.accountCount, s?.financeOnboardingCompleted, onBudget]);
 
   if (!authenticated) {
     return (
@@ -677,7 +701,7 @@ export function FinanceModule() {
             <DollarSign className="size-4" />
             Log salary
           </Button>
-          <Button size="sm" variant="outline" onClick={() => openTransaction("expense")}>
+          <Button size="sm" variant="outline" onClick={() => setQuickAddOpen(true)}>
             <Receipt className="size-4" />
             Expense
           </Button>
@@ -728,6 +752,8 @@ export function FinanceModule() {
 
       <ModuleRelations links={financeLinks} />
 
+      <AIInsightCard moduleKey="finance" />
+
       <Tabs value={pageTab} onValueChange={(v) => setPageTab("finance", v)}>
         <div className="flex flex-wrap items-center gap-2">
           <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
@@ -777,200 +803,22 @@ export function FinanceModule() {
           </DropdownMenu>
         </div>
 
-        {pageTab === "past" && (
-          <FinancePastView
-            summary={s}
-            pastCycles={pastCycles}
-            currency={currency}
-            onCycleClick={setCycleDetailId}
-          />
-        )}
-
-        {pageTab === "present" && (
-          <FinancePresentView summary={s} currency={currency} />
-        )}
-
-        {pageTab === "future" && (
-          <FinanceFutureView summary={s} currency={currency} />
-        )}
-
-        {pageTab === "overview" && (
+        {pageTab === "budget" && (
         <div className="mt-4 space-y-6">
-          <div className="flex flex-wrap gap-2 rounded-xl border bg-muted/30 p-3">
-            <Button size="sm" variant="outline" onClick={() => openTransaction("expense")}>
-              <Receipt className="size-4" />
-              Log expense
-            </Button>
-            <Button
-              size="sm"
-              variant={salaryLoggedThisCycle ? "outline" : "default"}
-              onClick={() => openTransaction("salary")}
-            >
-              <DollarSign className="size-4" />
-              Log salary
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (overdueCount > 0) {
-                  setPageTab("finance", "obligations");
-                } else {
-                  openTransaction("pay_obligation");
-                }
-              }}
-            >
-              Pay obligation
-              {overdueCount > 0 && (
-                <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
-                  {overdueCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
+          <FinanceOverview
+            summary={s}
+            accounts={accountList}
+            recurring={recurring.data ?? []}
+            currency={currency}
+            salaryDay={userSettings.data?.salaryDay ?? 10}
+            loading={summary.isLoading}
+            onLogSalary={() => openTransaction("salary")}
+            onLogExpense={() => openTransaction("expense")}
+            onTransferSavings={() => openTransaction("savings_transfer")}
+            onPayObligation={payObligation}
+            onAddRecurring={() => openAdd("recurring")}
+          />
 
-          {(!s?.currentCycle || Number(s.currentCycle.netSalary) === 0) && (
-            <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-5 space-y-3">
-              <p className="font-medium flex items-center gap-2">
-                <Calendar className="size-4" />
-                Get started with salary-based cycles
-              </p>
-              <ol className="list-decimal pl-5 text-sm text-muted-foreground space-y-1">
-                <li>
-                  Set your{" "}
-                  <Link href="/settings" className="text-primary underline">
-                    salary day
-                  </Link>{" "}
-                  (currently day {userSettings.data?.salaryDay ?? 25})
-                </li>
-                <li>Add a checking account and a savings account</li>
-                <li>Log your salary — this opens your first cycle</li>
-                <li>Allocate fixed costs, savings, and spending on the Cycle tab</li>
-              </ol>
-              <Button size="sm" onClick={() => openTransaction("salary")}>
-                Log salary now
-              </Button>
-            </div>
-          )}
-
-          {s?.currentCycle && (
-            <div className="rounded-xl border bg-card p-4 text-sm space-y-2">
-              <p className="font-medium">
-                Salary cycle: {s.currentCycle.startDate} → {s.currentCycle.endDate}
-              </p>
-              <p className="text-muted-foreground">
-                Net salary {formatMoney(s.currentCycle.netSalary, currency)} ·
-                Variable spent {formatMoney(s.currentCycle.totalVariableSpent, currency)} ·
-                Health score {s.currentCycle.financialHealthScore}/100
-              </p>
-              {s.currentCycle.remainingUnallocated !== 0 && (
-                <p className="text-amber-600">
-                  Unallocated: {formatMoney(s.currentCycle.remainingUnallocated, currency)}
-                </p>
-              )}
-            </div>
-          )}
-
-          {(s?.obligations.overdue.length ?? 0) > 0 && (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium text-destructive flex items-center gap-1.5">
-                  <AlertCircle className="size-4" />
-                  {s!.obligations.overdue.length} overdue obligation(s)
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Pay these from the Obligations tab or log an expense linked to each.
-                </p>
-              </div>
-              <Button size="sm" variant="destructive" onClick={() => setPageTab("finance", "obligations")}>
-                View
-              </Button>
-            </div>
-          )}
-
-          {/* Main tracking card */}
-          <div className="rounded-xl border bg-card p-5 space-y-6">
-            {/* Income row */}
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">Income received this month</p>
-                <p className="text-3xl font-semibold tabular-nums tracking-tight">
-                  {formatMoney(intel?.monthly.income ?? 0, currency)}
-                </p>
-              </div>
-              <Button onClick={() => openTransaction("salary")}>
-                <Plus className="size-4" /> Log salary
-              </Button>
-            </div>
-
-            {/* Budgets */}
-            <div className="border-t pt-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-medium">Monthly budgets (planned fixed costs)</p>
-                <Button variant="ghost" size="sm" onClick={() => setPageTab("finance", "budgets")}>
-                  Manage budgets
-                </Button>
-              </div>
-
-              {(s?.budgets ?? []).length === 0 ? (
-                <div className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
-                  No budgets created yet. Create budgets for Rent, Food, Transport, Utilities etc. so every expense is tracked against your salary.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {s!.budgets.map((b) => (
-                    <div key={b.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{b.name}</span>
-                        <span className="tabular-nums text-muted-foreground">
-                          {formatMoney(b.spent, currency)} / {formatMoney(b.amount, currency)}
-                        </span>
-                      </div>
-                      <Progress value={Math.min(100, b.percentUsed)} />
-                      <p className="text-[11px] text-muted-foreground">
-                        {b.percentUsed >= 100
-                          ? "Budget fully used"
-                          : `${formatPercent(100 - b.percentUsed)} remaining`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Remaining for savings */}
-            <div className="border-t pt-5">
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">Unallocated in cycle plan</p>
-                  <p className="text-2xl font-semibold tabular-nums text-emerald-600">
-                    {formatMoney(
-                      Math.max(0, s?.currentCycle?.remainingUnallocated ?? 0),
-                      currency,
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    After fixed, savings target, and sub-budgets
-                  </p>
-                </div>
-                <Button variant="outline" onClick={() => setPageTab("finance", "savings")}>
-                  View savings goals
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick actions */}
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={() => openTransaction("savings_transfer")}>
-              Transfer to savings
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPageTab("finance", "cycle")}>
-              Plan cycle
-            </Button>
-          </div>
-
-          {/* Charts only when there is data */}
           {intel && intel.spendingByCategory.length > 0 && (
             <div className="grid gap-4 lg:grid-cols-2">
               <MetricChart
@@ -995,7 +843,17 @@ export function FinanceModule() {
         )}
 
         {pageTab === "transactions" && (
-        <div className="mt-4">
+        <div className="mt-4 space-y-4">
+          <div className="flex flex-wrap gap-3">
+            {accountList.map((a) => (
+              <div key={a.id} className="rounded-lg border bg-card px-4 py-2 text-sm">
+                <p className="text-muted-foreground">{a.name}</p>
+                <p className="font-semibold tabular-nums">
+                  {formatMoney(Number(a.balance), currency)}
+                </p>
+              </div>
+            ))}
+          </div>
           <DataTable
             columns={txColumns}
             data={transactions.data ?? []}
@@ -1036,141 +894,7 @@ export function FinanceModule() {
         </div>
         )}
 
-        {pageTab === "budgets" && (
-        <div className="mt-4 space-y-4">
-          <Button size="sm" variant="outline" onClick={() => openAdd("budget")}>
-            <Plus className="size-4" /> Add budget
-          </Button>
-          <div className="grid gap-3 md:grid-cols-2">
-            {(budgets.data ?? []).map((b) => {
-              const amount = Number(b.amount);
-              const spent = Number(b.spent);
-              const pct = amount > 0 ? (spent / amount) * 100 : 0;
-              return (
-                <div key={b.id} className="rounded-lg border bg-card p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {b.periodStart} → {b.periodEnd}
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditing({ type: "budget", id: b.id });
-                          setDialogMode("budget");
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() =>
-                          confirmDelete("budget", () => deleteBudget.mutate(b.id))
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-lg font-semibold tabular-nums">
-                    {formatMoney(spent, currency)} / {formatMoney(amount, currency)}
-                  </p>
-                  <Progress className="mt-2" value={Math.min(100, pct)} />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Remaining {formatMoney(Math.max(0, amount - spent), currency)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        )}
-
-        {pageTab === "obligations" && (
-        <div className="mt-4 space-y-6">
-          {!s?.currentCycle ? (
-            <p className="text-sm text-muted-foreground">
-              Open a cycle by logging salary, then pending bills appear here each cycle.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Cycle {s.currentCycle.startDate} → {s.currentCycle.endDate}. Pay bills with one
-                tap — amounts pre-fill from your recurring setup.
-              </p>
-              {(s.obligations.overdue.length > 0 ||
-                s.obligations.upcoming.length > 0) && (
-                <div className="space-y-2">
-                  {[...s.obligations.overdue, ...s.obligations.upcoming].map((o) => (
-                    <div
-                      key={o.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-3"
-                    >
-                      <div>
-                        <p className="font-medium flex items-center gap-2">
-                          {o.name}
-                          {o.status === "overdue" && (
-                            <Badge variant="destructive">Overdue</Badge>
-                          )}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Due {o.dueDate} · {formatMoney(o.expectedAmount, currency)}
-                        </p>
-                      </div>
-                      <Button size="sm" onClick={() => payObligation(o)}>
-                        Pay
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {s.obligations.overdue.length === 0 &&
-                s.obligations.upcoming.length === 0 && (
-                  <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-6 text-center">
-                    No pending obligations. Add recurring bills on the Cycle tab.
-                  </p>
-                )}
-              {s.obligations.paidThisCycle.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Paid this cycle</h3>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    {s.obligations.paidThisCycle.map((o) => (
-                      <li key={o.id} className="flex justify-between rounded border px-3 py-2">
-                        <span>{o.name}</span>
-                        <span>{formatMoney(o.expectedAmount, currency)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
-          )}
-          <div className="flex items-center justify-between pt-2 border-t">
-            <h3 className="text-sm font-medium">Recurring templates</h3>
-            <Button size="sm" variant="outline" onClick={() => openAdd("recurring")}>
-              <Plus className="size-4" /> Add
-            </Button>
-          </div>
-          <ul className="space-y-2 text-sm">
-            {(recurring.data ?? []).map((r) => (
-              <li key={r.id} className="rounded border px-3 py-2 flex justify-between">
-                <span>{r.name}</span>
-                <span className="text-muted-foreground">
-                  {formatMoney(Number(r.amount), currency)} · day {r.dueDayOfMonth}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        )}
-
-        {pageTab === "cycle" && (
+        {pageTab === "cycle" && advancedCycleMode && (
         <div className="mt-4 space-y-4">
           {currentCycle ? (
             <>
@@ -1404,7 +1128,7 @@ export function FinanceModule() {
         </div>
         )}
 
-        {pageTab === "savings" && (
+        {pageTab === "goals" && (
         <div className="mt-4 space-y-4">
           <Button size="sm" variant="outline" onClick={() => openAdd("savings")}>
             <Plus className="size-4" /> Add savings goal
@@ -1726,6 +1450,12 @@ export function FinanceModule() {
           else openAdd(mode);
         }}
         onGoToCycle={() => setPageTab("finance", "cycle")}
+      />
+
+      <QuickAddTransactionDialog
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        expenseCats={expenseCatList}
       />
     </ModuleShell>
   );

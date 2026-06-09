@@ -6,32 +6,42 @@ const LearningModule = loadPanel(
   () => import("@/app/(dashboard)/learning/_module"),
   "LearningModule",
 );
-const EnglishModule = loadPanel(
-  () => import("@/app/(dashboard)/english/_module"),
-  "EnglishModule",
+const HealthModule = loadPanel(
+  () => import("@/app/(dashboard)/health/_module"),
+  "HealthModule",
+);
+const WellbeingTab = loadPanel(
+  () => import("@/components/growth/wellbeing-tab"),
+  "WellbeingTab",
 );
 
 export const GROWTH_HUB: HubConfig = {
   title: "Growth",
-  subtitle:
-    "Skills and language in one place — track learning and English practice together.",
+  subtitle: "Learning, health, and wellbeing — improve yourself in one place.",
   icon: GraduationCap,
   iconClassName: "bg-emerald-500/15 text-emerald-600",
   tabs: [
     {
       id: "learning",
       label: "Learning",
-      description: "Courses, skills, and study sessions.",
+      description: "Books, courses, skills, and study progress.",
+      primary: true,
     },
     {
-      id: "english",
-      label: "English",
-      description: "Vocabulary, practice, and language progress.",
+      id: "health",
+      label: "Health",
+      description: "Daily metrics — steps, sleep, water, exercise.",
+    },
+    {
+      id: "wellbeing",
+      label: "Wellbeing",
+      description: "Journal and spiritual practice in one view.",
     },
   ],
   defaultTab: "learning",
   panels: {
     learning: LearningModule,
-    english: EnglishModule,
+    health: HealthModule,
+    wellbeing: WellbeingTab,
   },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { Calendar, Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,12 @@ import { settingsApi } from "@/lib/api";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 
 export function FinanceSettingsCard({ enabled }: { enabled: boolean }) {
+  const [advancedCycleMode, setAdvancedCycleMode] = useState(false);
+
+  useEffect(() => {
+    setAdvancedCycleMode(localStorage.getItem("financeAdvancedCycleMode") === "true");
+  }, []);
+
   const { data, isLoading } = useStandData(
     ["settings"],
     () => settingsApi.get(),
@@ -96,6 +103,19 @@ export function FinanceSettingsCard({ enabled }: { enabled: boolean }) {
                 Total amount you want to save this calendar year.
               </p>
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={advancedCycleMode}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setAdvancedCycleMode(on);
+                  localStorage.setItem("financeAdvancedCycleMode", on ? "true" : "false");
+                  toast.success(on ? "Advanced cycle mode enabled" : "Advanced cycle mode disabled");
+                }}
+              />
+              Enable advanced cycle mode (shows Cycle tab in Finance settings)
+            </label>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save finance settings"}
             </Button>

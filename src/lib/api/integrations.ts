@@ -94,6 +94,9 @@ export const integrationsApi = {
         })
         .then((r) => r.data),
 
+    deleteEvent: (eventId: string) =>
+      apiClient.delete(`/integrations/google-calendar/events/${eventId}`),
+
     getEmbedUrl: () =>
       apiClient
         .get<{ url: string | null }>("/integrations/google-calendar/embed-url")
