@@ -79,8 +79,13 @@ interface DataCacheState {
   refetchAllRegistered: () => void;
   runMutation: <T>(
     fn: () => Promise<T>,
-    options?: { invalidate?: unknown[][]; invalidateAll?: boolean },
+    options?: {
+      invalidate?: unknown[][];
+      invalidateAll?: boolean;
+      optimistic?: { keyParts: unknown[]; updater: (current: unknown) => unknown };
+    },
   ) => Promise<T>;
+  patchCache: <T>(keyParts: unknown[], updater: (current: T | undefined) => T) => void;
 }
 
 function ensureEntry<T>(
@@ -203,8 +208,37 @@ export const useDataCache = create<DataCacheState>((set, get) => ({
     }
   },
 
+  patchCache: (keyParts, updater) => {
+    const key = serializeKey(keyParts);
+    set((s) => {
+      const entry = ensureEntry(s.entries, key);
+      entry.data = updater(entry.data);
+      entry.fetchedAt = Date.now();
+      replaceSnapshot(entry);
+      return { entries: { ...s.entries } };
+    });
+    notifyKey(key);
+  },
+
   runMutation: async (fn, options) => {
     set({ pendingMutations: get().pendingMutations + 1 });
+    let rollback: (() => void) | undefined;
+    if (options?.optimistic) {
+      const key = serializeKey(options.optimistic.keyParts);
+      const prev = get().entries[key]?.data;
+      get().patchCache(options.optimistic.keyParts, options.optimistic.updater);
+      rollback = () => {
+        if (prev !== undefined) {
+          set((s) => {
+            const entry = ensureEntry(s.entries, key);
+            entry.data = prev;
+            replaceSnapshot(entry);
+            return { entries: { ...s.entries } };
+          });
+          notifyKey(key);
+        }
+      };
+    }
     try {
       const result = await fn();
       if (options?.invalidate?.length) {
@@ -213,6 +247,9 @@ export const useDataCache = create<DataCacheState>((set, get) => ({
         get().refetchAllRegistered();
       }
       return result;
+    } catch (e) {
+      rollback?.();
+      throw e;
     } finally {
       set({ pendingMutations: Math.max(0, get().pendingMutations - 1) });
     }

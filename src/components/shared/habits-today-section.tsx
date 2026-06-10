@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,17 +20,42 @@ interface HabitsTodaySectionProps {
 }
 
 export function HabitsTodaySection({ habits }: HabitsTodaySectionProps) {
+  const [liveMessage, setLiveMessage] = useState("");
+
   const checkIn = useStandMutation(
     (habitId: string) =>
       habitsApi.createLog(habitId, { completedAt: new Date().toISOString() }),
     {
       invalidateKeys: [["productivity", "today-summary"], ["habits"]],
-      onSuccess: () => toast.success("Habit logged"),
+      optimistic: {
+        keyParts: [["productivity", "today-summary"]],
+        updater: (current, habitId) => {
+          const summary = current as {
+            habits?: HabitToday[];
+          } | undefined;
+          if (!summary?.habits) return current;
+          return {
+            ...summary,
+            habits: summary.habits.map((h) =>
+              h.id === habitId ? { ...h, logged: true } : h,
+            ),
+          };
+        },
+      },
+      onSuccess: (_data, habitId) => {
+        const habit = habits.find((h) => h.id === habitId);
+        const msg = `${habit?.name ?? "Habit"} logged`;
+        setLiveMessage(msg);
+        toast.success("Habit logged");
+      },
     },
   );
 
   return (
     <Card>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveMessage}
+      </p>
       <CardHeader>
         <CardTitle className="text-base">Habits due today</CardTitle>
       </CardHeader>

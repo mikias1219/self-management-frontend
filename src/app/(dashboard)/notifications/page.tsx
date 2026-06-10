@@ -49,7 +49,18 @@ export default function NotificationsPage() {
         readAt: new Date().toISOString(),
       }),
     {
-      invalidateKeys: [["notifications"], ["notifications", "unread-count"], ["dashboard"]],
+      invalidateKeys: [["notifications", "unread-count"], ["dashboard"]],
+      optimistic: {
+        keyParts: [["notifications"]],
+        updater: (current, id) => {
+          const list = current as Notification[] | undefined;
+          if (!list) return current;
+          const now = new Date().toISOString();
+          return list.map((n) =>
+            n.id === id ? { ...n, isRead: true, readAt: now } : n,
+          );
+        },
+      },
       onSuccess: () => toast.success("Marked as read"),
     },
   );
@@ -67,7 +78,18 @@ export default function NotificationsPage() {
       );
     },
     {
-      invalidateKeys: [["notifications"], ["notifications", "unread-count"], ["dashboard"]],
+      invalidateKeys: [["notifications", "unread-count"], ["dashboard"]],
+      optimistic: {
+        keyParts: [["notifications"]],
+        updater: (current) => {
+          const list = current as Notification[] | undefined;
+          if (!list) return current;
+          const now = new Date().toISOString();
+          return list.map((n) =>
+            n.isRead ? n : { ...n, isRead: true, readAt: now },
+          );
+        },
+      },
       onSuccess: () => toast.success("All notifications marked as read"),
     },
   );

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/shared/markdown-editor";
 import { useStandData, useStandMutation } from "@/hooks/use-stand-data";
 import { usePeriod } from "@/hooks/use-period";
 import { journalApi } from "@/lib/api";
@@ -46,6 +46,7 @@ export function JournalModule() {
   const [edit, setEdit] = useState<JournalEntry | null>(null);
   const [readEntry, setReadEntry] = useState<JournalEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<JournalEntry | null>(null);
+  const [draftContent, setDraftContent] = useState("");
 
   const { data: all, isLoading } = useStandData(
     ["journal"],
@@ -103,7 +104,7 @@ export function JournalModule() {
       icon={FileText}
       iconClassName="bg-orange-500/15 text-orange-600"
       actions={
-        <Button size="sm" onClick={() => { setEdit(null); setOpen(true); }}>
+        <Button size="sm" onClick={() => { setEdit(null); setDraftContent(""); setOpen(true); }}>
           <Plus className="size-4" /> New entry
         </Button>
       }
@@ -150,7 +151,7 @@ export function JournalModule() {
                     size="icon-sm"
                     variant="ghost"
                     aria-label="Edit entry"
-                    onClick={() => { setEdit(entry); setOpen(true); }}
+                    onClick={() => { setEdit(entry); setDraftContent(entry.content ?? ""); setOpen(true); }}
                   >
                     <Pencil className="size-3.5" />
                   </Button>
@@ -191,6 +192,7 @@ export function JournalModule() {
                   variant="outline"
                   onClick={() => {
                     setEdit(readEntry);
+                    setDraftContent(readEntry.content ?? "");
                     setReadEntry(null);
                     setOpen(true);
                   }}
@@ -203,7 +205,16 @@ export function JournalModule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) {
+            setEdit(null);
+            setDraftContent("");
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{edit ? "Edit entry" : "New journal entry"}</DialogTitle>
@@ -221,7 +232,7 @@ export function JournalModule() {
                   entryType: fd.get("entryType") as JournalEntryType,
                   entryDate: String(fd.get("entryDate")),
                   title: String(fd.get("title")),
-                  content: String(fd.get("content")),
+                  content: draftContent,
                   tags: tagsRaw ? tagsRaw.split(",").map((t) => t.trim()) : undefined,
                 },
               });
@@ -244,8 +255,12 @@ export function JournalModule() {
               <Input id="title" name="title" required defaultValue={edit?.title} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="content">Content</Label>
-              <Textarea id="content" name="content" rows={6} required defaultValue={edit?.content} />
+              <Label>Content</Label>
+              <MarkdownEditor
+                value={draftContent}
+                onChange={setDraftContent}
+                placeholder="Write your thoughts… Supports **bold**, lists, and headings."
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="tags">Tags (comma-separated)</Label>

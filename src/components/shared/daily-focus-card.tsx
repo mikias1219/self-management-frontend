@@ -27,7 +27,24 @@ export function DailyFocusCard({ tasks }: DailyFocusCardProps) {
 
   const complete = useStandMutation(
     (id: string) => tasksApi.update(id, { taskStatus: "done" }),
-    { invalidateKeys: [["productivity", "today-summary"], ["tasks"]] },
+    {
+      invalidateKeys: [["productivity", "today-summary"], ["tasks"]],
+      optimistic: {
+        keyParts: [["productivity", "today-summary"]],
+        updater: (current, id) => {
+          const summary = current as {
+            tasks?: Array<{ id: string; taskStatus: string }>;
+          } | undefined;
+          if (!summary?.tasks) return current;
+          return {
+            ...summary,
+            tasks: summary.tasks.map((t) =>
+              t.id === id ? { ...t, taskStatus: "done" } : t,
+            ),
+          };
+        },
+      },
+    },
   );
 
   const focus = tasks.find((t) => t.id === focusId) ?? tasks[0];

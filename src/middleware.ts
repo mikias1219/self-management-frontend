@@ -22,6 +22,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (pathname === "/today") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+  if (pathname === "/more") {
+    return NextResponse.redirect(new URL("/insights", request.url));
+  }
+  if (pathname === "/growth") {
+    return NextResponse.redirect(new URL("/life?tab=learning", request.url));
+  }
+  if (pathname === "/life" && request.nextUrl.searchParams.get("tab") === "finance") {
+    const financeUrl = new URL("/finance", request.url);
+    const action = request.nextUrl.searchParams.get("action");
+    if (action) financeUrl.searchParams.set("action", action);
+    return NextResponse.redirect(financeUrl);
+  }
+
   return NextResponse.next();
 }
 

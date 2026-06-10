@@ -1,21 +1,17 @@
 import { apiClient } from "./client";
-import type { ActivityLog, DateRangeQuery } from "@/lib/types";
-
-type ActivityLogsResponse =
-  | ActivityLog[]
-  | { data: ActivityLog[]; meta?: { page: number; limit: number; total: number } };
-
-function unwrapLogs(response: ActivityLogsResponse): ActivityLog[] {
-  return Array.isArray(response) ? response : response.data;
-}
+import type { ActivityLog, DateRangeQuery, PaginatedResponse } from "@/lib/types";
 
 export const activityLogsApi = {
-  getAll: (params?: DateRangeQuery) =>
+  getPage: (params?: DateRangeQuery) =>
     apiClient
-      .get<ActivityLogsResponse>("/activity-logs", { params: { ...params, limit: 20 } })
-      .then((r) => unwrapLogs(r.data)),
+      .get<PaginatedResponse<ActivityLog>>("/activity-logs", {
+        params: { page: 1, limit: 20, ...params },
+      })
+      .then((r) => r.data),
+
+  /** @deprecated Use getPage — returns first page data only for hints. */
   getByPeriod: (params: DateRangeQuery) =>
-    apiClient
-      .get<ActivityLogsResponse>("/activity-logs", { params: { ...params, limit: 20 } })
-      .then((r) => unwrapLogs(r.data)),
+    activityLogsApi.getPage({ ...params, limit: params.limit ?? 20 }).then(
+      (r) => r.data,
+    ),
 };

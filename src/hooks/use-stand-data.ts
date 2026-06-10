@@ -64,6 +64,10 @@ export function useStandMutation<TArg, TResult>(
   options?: {
     invalidateKeys?: unknown[][];
     invalidateAll?: boolean;
+    optimistic?: {
+      keyParts: unknown[];
+      updater: (current: unknown, arg: TArg) => unknown;
+    };
     onSuccess?: (result: TResult, arg: TArg) => void;
     onError?: (error: unknown) => void;
   },
@@ -81,6 +85,13 @@ export function useStandMutation<TArg, TResult>(
           {
             invalidate: options?.invalidateKeys,
             invalidateAll: options?.invalidateAll ?? false,
+            optimistic: options?.optimistic
+              ? {
+                  keyParts: options.optimistic.keyParts,
+                  updater: (current) =>
+                    options.optimistic!.updater(current, arg),
+                }
+              : undefined,
           },
         );
         options?.onSuccess?.(result as TResult, arg);

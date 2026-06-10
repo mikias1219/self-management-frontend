@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/shared/password-input";
 import { authApi } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtime/socket";
 
@@ -56,11 +57,22 @@ function LoginFormFields() {
         )}
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" {...register("password")} />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/profile"
+            className="text-xs text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
+        <PasswordInput id="password" {...register("password")} />
         {errors.password && (
           <p className="text-xs text-destructive">{errors.password.message}</p>
         )}
+        <p className="text-xs text-muted-foreground">
+          Reset your password from Profile after signing in.
+        </p>
       </div>
     </AuthFormShell>
   );
@@ -108,7 +120,7 @@ function RegisterFormFields() {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" {...register("password")} />
+        <PasswordInput id="password" {...register("password")} />
         {errors.password && (
           <p className="text-xs text-destructive">{errors.password.message}</p>
         )}

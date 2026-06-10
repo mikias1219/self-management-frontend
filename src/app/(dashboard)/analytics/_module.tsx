@@ -46,9 +46,9 @@ const MANAGE_LINKS = [
   { label: "Tasks", href: "/productivity?tab=tasks" },
   { label: "Goals", href: "/productivity?tab=goals" },
   { label: "Habits", href: "/productivity?tab=habits" },
-  { label: "Learning", href: "/growth?tab=learning" },
-  { label: "English", href: "/growth?tab=english" },
-  { label: "Finance", href: "/life?tab=finance" },
+  { label: "Learning", href: "/life?tab=learning" },
+  { label: "English", href: "/life?tab=english" },
+  { label: "Finance", href: "/finance" },
   { label: "Health", href: "/life?tab=health" },
   { label: "Journal", href: "/life?tab=journal" },
 ] as const;

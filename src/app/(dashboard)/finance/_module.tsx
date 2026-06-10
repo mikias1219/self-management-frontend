@@ -150,6 +150,8 @@ export function FinanceModule() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [advancedCycleMode, setAdvancedCycleMode] = useState(false);
+  const [txPage, setTxPage] = useState(1);
+  const [txLimit, setTxLimit] = useState(20);
 
   useEffect(() => {
     setAdvancedCycleMode(localStorage.getItem("financeAdvancedCycleMode") === "true");
@@ -185,9 +187,10 @@ export function FinanceModule() {
       staleTime: 300_000,
     },
   );
+  const txQuery = { ...query, page: txPage, limit: txLimit };
   const transactions = useStandData(
-    ["finance", "transactions", query],
-    () => financeApi.transactions.getAll(query),
+    ["finance", "transactions", txQuery],
+    () => financeApi.transactions.getAll(txQuery),
     {
       enabled: authenticated && (onTransactions || dialogOpen),
       staleTime: 300_000,
@@ -756,7 +759,8 @@ export function FinanceModule() {
 
       <Tabs value={pageTab} onValueChange={(v) => setPageTab("finance", v)}>
         <div className="flex flex-wrap items-center gap-2">
-          <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
+          <div className="-mx-1 flex-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible sm:pb-0">
+          <TabsList className="flex h-auto w-max min-w-full flex-nowrap justify-start gap-1 bg-transparent p-0 sm:w-auto sm:flex-wrap">
             {dailyTabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
@@ -772,6 +776,7 @@ export function FinanceModule() {
               </TabsTrigger>
             ))}
           </TabsList>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -856,9 +861,19 @@ export function FinanceModule() {
           </div>
           <DataTable
             columns={txColumns}
-            data={transactions.data ?? []}
+            data={transactions.data?.data ?? []}
             loading={transactions.isLoading}
             getRowId={(r) => r.id}
+            serverSide
+            total={transactions.data?.meta.total ?? 0}
+            page={txPage}
+            pageSize={txLimit}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageChange={setTxPage}
+            onPageSizeChange={(size) => {
+              setTxLimit(size);
+              setTxPage(1);
+            }}
             emptyMessage="No transactions yet. Add your salary as income, then log expenses against your budgets."
             onEdit={(row) => {
               setEditing({ type: "transaction", id: row.id });
@@ -1350,7 +1365,7 @@ export function FinanceModule() {
         editingId={editing?.id}
         editTx={
           editing?.type === "transaction"
-            ? (transactions.data ?? []).find((t) => t.id === editing.id)
+            ? (transactions.data?.data ?? []).find((t) => t.id === editing.id)
             : undefined
         }
         editSavings={

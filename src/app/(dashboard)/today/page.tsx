@@ -1,5 +1,5 @@
-import { TodayHubView } from "@/components/today/today-hub-view";
+import { redirect } from "next/navigation";
 
-export default function TodayPage() {
-  return <TodayHubView />;
+export default function TodayRedirectPage() {
+  redirect("/");
 }

@@ -81,6 +81,9 @@
   --sidebar-accent-foreground: oklch(0.28 0.04 var(--accent-hue));
   --sidebar-border: oklch(0.92 0.01 260);
   --sidebar-ring: oklch(0.58 0.14 var(--accent-hue));
+  --content-width: 80rem;
+  --surface-elevated: oklch(1 0 0);
+  --surface-overlay: oklch(0.995 0.002 260);
 }
 
 [data-accent="blue"] {

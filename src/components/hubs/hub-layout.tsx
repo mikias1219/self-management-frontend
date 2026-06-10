@@ -99,6 +99,8 @@ export function HubLayout({
       <TabsTrigger
         key={t.id}
         value={t.id}
+        id={`hub-tab-${t.id}`}
+        aria-controls={`hub-panel-${t.id}`}
         className={secondaryTabClass(activeTab === t.id)}
       >
         {TabIcon && <TabIcon className="mr-1 size-3 shrink-0" />}

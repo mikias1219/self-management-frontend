@@ -40,8 +40,8 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 shrink-0 flex-col border-r bg-gradient-to-b from-sidebar via-sidebar to-sidebar/80 transition-[width] duration-200",
-        collapsed ? "w-14" : "w-[180px]",
+        "hidden h-full min-h-0 shrink-0 flex-col border-r bg-gradient-to-b from-sidebar via-sidebar to-sidebar/80 transition-[width] duration-200 md:flex",
+        collapsed ? "w-14" : "w-[200px]",
       )}
     >
       <div className="flex shrink-0 flex-col border-b border-sidebar-border/60 px-2.5 py-2.5">
@@ -89,7 +89,7 @@ export function AppSidebar() {
                   ? pathname === "/"
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
-              const showSeparator = item.href === "/ai-coach";
+              const showSeparator = false;
 
               return (
                 <li key={item.href}>

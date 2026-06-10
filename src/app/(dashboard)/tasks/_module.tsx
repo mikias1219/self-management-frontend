@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { TaskPastView } from "@/components/tasks/task-past-view";
 import { TaskPresentView } from "@/components/tasks/task-present-view";
 import { TaskFutureView } from "@/components/tasks/task-future-view";
+import { TaskMatrixView } from "@/components/productivity/task-matrix-view";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeleteConfirmDialog } from "@/components/productivity/delete-confirm-dialog";
 import { ModuleShell } from "@/components/shared/module-shell";
@@ -62,7 +63,9 @@ export function TasksModule() {
   const [reportMinutes, setReportMinutes] = useState("");
   const [reportNote, setReportNote] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [ppfTab, setPpfTab] = useState<"present" | "past" | "future" | "all">("present");
+  const [ppfTab, setPpfTab] = useState<
+    "present" | "past" | "future" | "all" | "matrix"
+  >("present");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: allTasks, isLoading } = useStandData(
@@ -219,7 +222,7 @@ export function TasksModule() {
             action: {
               label: "Open Finance",
               onClick: () =>
-                router.push("/life?tab=finance&action=log-expense"),
+                router.push("/finance?action=log-expense"),
             },
           });
         }
@@ -393,7 +396,7 @@ export function TasksModule() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => router.push("/life?tab=finance")}
+              onClick={() => router.push("/finance")}
             >
               Record in Finance
             </Button>
@@ -438,7 +441,7 @@ export function TasksModule() {
 
       <Tabs value={ppfTab} onValueChange={(v) => setPpfTab(v as typeof ppfTab)}>
         <TabsList className="mb-4 h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
-          {(["present", "past", "future", "all"] as const).map((tab) => (
+          {(["present", "past", "future", "matrix", "all"] as const).map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
@@ -479,6 +482,15 @@ export function TasksModule() {
         <TaskFutureView
           tasks={allTasks ?? []}
           onEdit={(t) => {
+            setEditTask(t);
+            setOpen(true);
+          }}
+        />
+      )}
+      {ppfTab === "matrix" && (
+        <TaskMatrixView
+          tasks={allTasks ?? []}
+          onSelect={(t) => {
             setEditTask(t);
             setOpen(true);
           }}

@@ -33,6 +33,8 @@ export interface DateRangeQuery {
   period?: AnalyticsPeriod;
   startDate?: string;
   endDate?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface DateRangeResult {

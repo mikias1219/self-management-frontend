@@ -2,18 +2,18 @@ import {
   BookOpen,
   Heart,
   HeartHandshake,
-  Wallet,
+  Languages,
 } from "lucide-react";
 import { loadPanel } from "@/components/hubs/configs/panel-loader";
 import type { HubConfig } from "@/components/hubs/configs/types";
 
-const FinanceModule = loadPanel(
-  () => import("@/app/(dashboard)/finance/_module"),
-  "FinanceModule",
-);
 const HealthModule = loadPanel(
   () => import("@/app/(dashboard)/health/_module"),
   "HealthModule",
+);
+const LearningModule = loadPanel(
+  () => import("@/app/(dashboard)/learning/_module"),
+  "LearningModule",
 );
 const SpiritualModule = loadPanel(
   () => import("@/app/(dashboard)/spiritual/_module"),
@@ -23,31 +23,29 @@ const JournalModule = loadPanel(
   () => import("@/app/(dashboard)/journal/_module"),
   "JournalModule",
 );
+const EnglishModule = loadPanel(
+  () => import("@/app/(dashboard)/english/_module"),
+  "EnglishModule",
+);
 
 export const LIFE_HUB: HubConfig = {
   title: "Life",
   subtitle:
-    "Finance, health, spiritual practice, and journaling — the personal side of your stand.",
+    "Health, learning, journaling, spiritual practice, and English — the personal side of your stand.",
   icon: HeartHandshake,
   iconClassName: "bg-rose-500/15 text-rose-600",
   tabs: [
-    {
-      id: "finance",
-      label: "Finance",
-      description: "Accounts, budgets, transactions, and savings.",
-      icon: Wallet,
-      primary: true,
-    },
     {
       id: "health",
       label: "Health",
       description: "Workouts, metrics, and wellness tracking.",
       icon: Heart,
+      primary: true,
     },
     {
-      id: "spiritual",
-      label: "Spiritual",
-      description: "Prayer, scripture, and faith practices.",
+      id: "learning",
+      label: "Learning",
+      description: "Books, courses, skills, and study progress.",
       icon: BookOpen,
     },
     {
@@ -56,12 +54,25 @@ export const LIFE_HUB: HubConfig = {
       description: "Daily entries and reflections.",
       icon: BookOpen,
     },
+    {
+      id: "spiritual",
+      label: "Spiritual",
+      description: "Prayer, scripture, and faith practices.",
+      icon: BookOpen,
+    },
+    {
+      id: "english",
+      label: "English",
+      description: "Vocabulary, practice, and language drills.",
+      icon: Languages,
+    },
   ],
-  defaultTab: "finance",
+  defaultTab: "health",
   panels: {
-    finance: FinanceModule,
     health: HealthModule,
-    spiritual: SpiritualModule,
+    learning: LearningModule,
     journal: JournalModule,
+    spiritual: SpiritualModule,
+    english: EnglishModule,
   },
 };

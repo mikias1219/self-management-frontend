@@ -13,7 +13,7 @@ import type {
   RecurringObligation,
   SavingsGoal,
 } from "@/lib/types";
-import type { DateRangeQuery } from "@/lib/types";
+import type { DateRangeQuery, PaginatedResponse } from "@/lib/types";
 
 export const financeApi = {
   accounts: createCrudApi<FinanceAccount>("/finance/accounts"),
@@ -21,7 +21,9 @@ export const financeApi = {
     ...createCrudApi<FinanceTransaction>("/finance/transactions"),
     getAll: (params?: DateRangeQuery) =>
       apiClient
-        .get<FinanceTransaction[]>("/finance/transactions", { params })
+        .get<PaginatedResponse<FinanceTransaction>>("/finance/transactions", {
+          params: { page: 1, limit: 20, ...params },
+        })
         .then((r) => r.data),
     createSimple: (data: {
       amount: number;

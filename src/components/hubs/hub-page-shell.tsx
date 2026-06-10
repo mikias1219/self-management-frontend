@@ -45,7 +45,14 @@ function HubVisitedPanels({
         if (!Panel) return null;
         const isActive = tabId === activeTab;
         return (
-          <div key={tabId} hidden={!isActive} aria-hidden={!isActive}>
+          <div
+            key={tabId}
+            role="tabpanel"
+            id={`hub-panel-${tabId}`}
+            aria-labelledby={`hub-tab-${tabId}`}
+            hidden={!isActive}
+            tabIndex={isActive ? 0 : -1}
+          >
             <HubProvider>
               <Panel />
             </HubProvider>
